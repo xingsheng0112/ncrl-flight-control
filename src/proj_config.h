@@ -19,7 +19,7 @@
 /* telemetry debug channel protocols */
 #define TELEM_SHELL      0
 #define TELEM_DEBUG_LINK 1
-#define SELECT_DEBUG_TELEM TELEM_SHELL
+#define SELECT_DEBUG_TELEM TELEM_DEBUG_LINK
 
 /* debug link message publish rate */
 #define DEBUG_LINK_PUBLISH_20Hz  0 //recommanded for wireless communication
@@ -46,6 +46,12 @@
 #define QUADROTOR_USE_PID      0
 #define QUADROTOR_USE_GEOMETRY 1
 #define SELECT_CONTROLLER QUADROTOR_USE_GEOMETRY
+
+/* quadrotor control estimation algorithms */
+#define CONTROLLER_ESTIMATION_USE_NONE 0
+#define CONTROLLER_ESTIMATION_USE_ADAPTIVE 1
+#define CONTROLLER_ESTIMATION_USE_ICL 2
+#define SELECT_CONTROLLER_ESTIMATOR CONTROLLER_ESTIMATION_USE_ADAPTIVE
 
 /*===================*
  * hardware settings *

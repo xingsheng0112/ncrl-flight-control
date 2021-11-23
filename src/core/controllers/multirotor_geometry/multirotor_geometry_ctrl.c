@@ -88,6 +88,17 @@ float motor_thrust_max = 0.0f;
 
 bool height_ctrl_only = false;
 
+//adaptive & ICL parameters
+
+//adaptive
+MAT_ALLOC(theta, 3, 1);
+MAT_ALLOC(theta_hat_dot, 3, 1);
+float adaptive_gamma = 0.000002;
+float c2 = 15;
+//ICL
+float k_icl = 0.005;
+float N = 10;
+
 void geometry_ctrl_init(void)
 {
 	init_multirotor_geometry_param_list();
@@ -129,6 +140,13 @@ void geometry_ctrl_init(void)
 	MAT_INIT(b1d, 3, 1);
 	MAT_INIT(b2d, 3, 1);
 	MAT_INIT(b3d, 3, 1);
+
+//adaptive & ICL parameters
+	MAT_INIT(theta, 3, 1);
+	mat_data(theta)[0] = 0.0f;
+	mat_data(theta)[1] = 0.0f;
+	mat_data(theta)[2] = 0.0f;
+	MAT_INIT(theta_hat_dot, 3, 1);
 
 	/* modify local variables when user change them via ground station */
 	set_sys_param_update_var_addr(MR_GEO_GAIN_ROLL_P, &krx);
@@ -461,10 +479,20 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mat_data(inertia_effect)[1] = mat_data(WJW)[1];
 	mat_data(inertia_effect)[2] = mat_data(WJW)[2];
 
+	/*adaptive & ICL*/
+	mat_data(theta_hat_dot)[0] = adaptive_gamma* *output_force*(mat_data(eR)[0] + c2*mat_data(eW)[0]);
+	mat_data(theta_hat_dot)[1] = adaptive_gamma* *output_force*(mat_data(eR)[1] + c2*mat_data(eW)[1]);
+	mat_data(theta_hat_dot)[2] = adaptive_gamma* *output_force*(mat_data(eR)[2] + c2*mat_data(eW)[2]);
+	MAT_ADD(&theta,&theta_hat_dot,&theta);
+	mat_data(theta)[2] = 0;
+
 	/* control input M1, M2, M3 */
-	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0];
-	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1];
+	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0]
+						- mat_data(theta)[0]* *output_force;
+	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1]
+						- mat_data(theta)[1]* *output_force;
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
+
 }
 
 #define l_div_4 (0.25f * (1.0f / MOTOR_TO_CG_LENGTH_M))
@@ -683,6 +711,29 @@ void send_geometry_moment_ctrl_debug(debug_msg_t *payload)
 	pack_debug_debug_message_float(&geometry_ctrl_feedfoward_moments[2], payload);
 }
 
+void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
+{
+	float roll_error = rad_to_deg(mat_data(eR)[0]);
+	float pitch_error = rad_to_deg(mat_data(eR)[1]);
+	float yaw_error = rad_to_deg(mat_data(eR)[2]);
+
+	float wx_error = rad_to_deg(mat_data(eW)[0]);
+	float wy_error = rad_to_deg(mat_data(eW)[1]);
+	float wz_error = rad_to_deg(mat_data(eW)[2]);
+	
+	float theta_x = mat_data(theta)[0];
+	float theta_y = mat_data(theta)[1];
+
+	pack_debug_debug_message_header(payload, MESSAGE_ID_ADAPTIVE_THETA);
+	pack_debug_debug_message_float(&roll_error, payload);
+	pack_debug_debug_message_float(&pitch_error, payload);
+	pack_debug_debug_message_float(&yaw_error, payload);
+	pack_debug_debug_message_float(&wx_error, payload);
+	pack_debug_debug_message_float(&wy_error, payload);
+	pack_debug_debug_message_float(&wz_error, payload);
+	pack_debug_debug_message_float(&theta_x, payload);
+	pack_debug_debug_message_float(&theta_y, payload);
+}
 void send_geometry_tracking_ctrl_debug(debug_msg_t *payload)
 {
 	pack_debug_debug_message_header(payload, MESSAGE_ID_GEOMETRY_TRACKING_CTRL);

@@ -31,7 +31,7 @@ void task_debug_link(void *param)
 	while(1) {
 		//while(xSemaphoreTake(debug_link_task_semphr, portMAX_DELAY) != pdTRUE);
 		//send_imu_debug_message(&payload);
-		send_attitude_euler_debug_message(&payload);
+		//send_attitude_euler_debug_message(&payload);
 		//send_attitude_quaternion_debug_message(&payload);
 		//send_attitude_imu_debug_message(&payload);
 		//send_pid_debug_message(&payload);
@@ -55,6 +55,7 @@ void task_debug_link(void *param)
 		//send_vins_mono_velocity_debug_message(&payload);
 		//send_gps_accuracy_debug_message(&payload);
 
+		send_controller_estimation_adaptive_debug(&payload);
 		send_onboard_data(payload.s, payload.len);
 		freertos_task_delay(50); //XXX: 20Hz
 	}
