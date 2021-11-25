@@ -26,6 +26,7 @@
 #include "waypoint_following.h"
 #include "fence.h"
 
+
 #define dt 0.0025 //[s]
 #define MOTOR_TO_CG_LENGTH 16.25f //[cm]
 #define MOTOR_TO_CG_LENGTH_M (MOTOR_TO_CG_LENGTH * 0.01) //[m]
@@ -95,9 +96,17 @@ MAT_ALLOC(theta, 3, 1);
 MAT_ALLOC(theta_hat_dot, 3, 1);
 float adaptive_gamma = 0.000002;
 float c2 = 15;
+
 //ICL
 float k_icl = 0.005;
-float N = 10;
+unsigned int ICL_flag;
+MAT_ALLOC(Y_omega, 3, 3);
+MAT_ALLOC(Y_omega_J, 3, 1);
+MAT_ALLOC(last_angular_velocity, 3, 1);
+
+
+
+ICL_sigma_t sigma_array;
 
 void geometry_ctrl_init(void)
 {
@@ -147,6 +156,9 @@ void geometry_ctrl_init(void)
 	mat_data(theta)[1] = 0.0f;
 	mat_data(theta)[2] = 0.0f;
 	MAT_INIT(theta_hat_dot, 3, 1);
+	MAT_INIT(Y_omega, 3, 3);
+	MAT_INIT(Y_omega_J, 3, 1);
+	MAT_INIT(last_angular_velocity, 3, 1);
 
 	/* modify local variables when user change them via ground station */
 	set_sys_param_update_var_addr(MR_GEO_GAIN_ROLL_P, &krx);
@@ -479,19 +491,38 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mat_data(inertia_effect)[1] = mat_data(WJW)[1];
 	mat_data(inertia_effect)[2] = mat_data(WJW)[2];
 
-	/*adaptive & ICL*/
-	mat_data(theta_hat_dot)[0] = adaptive_gamma* *output_force*(mat_data(eR)[0] + c2*mat_data(eW)[0]);
-	mat_data(theta_hat_dot)[1] = adaptive_gamma* *output_force*(mat_data(eR)[1] + c2*mat_data(eW)[1]);
-	mat_data(theta_hat_dot)[2] = adaptive_gamma* *output_force*(mat_data(eR)[2] + c2*mat_data(eW)[2]);
-	MAT_ADD(&theta,&theta_hat_dot,&theta);
-	mat_data(theta)[2] = 0;
+#if (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_NONE)
+	/* control input M1, M2, M3 */
+	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0];
+	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1];
+	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
 
+#elif (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_ADAPTIVE)
 	/* control input M1, M2, M3 */
 	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0]
 						- mat_data(theta)[0]* *output_force;
 	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1]
 						- mat_data(theta)[1]* *output_force;
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
+	
+	/*adaptive*/	
+	mat_data(theta_hat_dot)[0] = adaptive_gamma* *output_force*(mat_data(eR)[0] + c2*mat_data(eW)[0]);
+	mat_data(theta_hat_dot)[1] = adaptive_gamma* *output_force*(mat_data(eR)[1] + c2*mat_data(eW)[1]);
+	mat_data(theta_hat_dot)[2] = adaptive_gamma* *output_force*(mat_data(eR)[2] + c2*mat_data(eW)[2]);
+	MAT_ADD(&theta,&theta_hat_dot,&theta);
+	mat_data(theta)[2] = 0;
+#elif (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_ADAPTIVE)	
+	/* control input M1, M2, M3 */
+	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0]
+						- mat_data(theta)[0]* *output_force;
+	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1]
+						- mat_data(theta)[1]* *output_force;
+	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
+	
+	/*ICL*/
+		
+	mat_data(theta)[2] = 0;
+#endif
 
 }
 

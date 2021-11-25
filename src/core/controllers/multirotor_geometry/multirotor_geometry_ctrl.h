@@ -4,6 +4,15 @@
 #include "imu.h"
 #include "ahrs.h"
 #include "debug_link.h"
+#include "matrix.h"
+
+#define ICL_N 20
+
+typedef struct ICL_sigma{
+	float y;
+	MAT_ALLOC(y_omega,3,1);	
+	MAT_ALLOC(M_hat,3,1);	
+} ICL_sigma_t;
 
 void geometry_ctrl_init(void);
 void multirotor_geometry_control(radio_t *rc, float *desired_heading);
