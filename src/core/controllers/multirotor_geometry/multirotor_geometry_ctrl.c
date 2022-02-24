@@ -1,3 +1,4 @@
+#include "proj_config.h"
 #include "arm_math.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -16,6 +17,7 @@
 #include "autopilot.h"
 #include "debug_link.h"
 #include "multirotor_geometry_param.h"
+#include "multirotor_geometry_ctrl.h"
 #include "position_state.h"
 #include "multirotor_rc.h"
 #include "barometer.h"
@@ -95,18 +97,27 @@ bool height_ctrl_only = false;
 MAT_ALLOC(theta, 3, 1);
 MAT_ALLOC(theta_hat_dot, 3, 1);
 float adaptive_gamma = 0.000002;
-float c2 = 15;
+float c2 = 10;
 
 //ICL
-float k_icl = 0.005;
+float k_icl = 0.0005;
+//float k_icl = 0.000;
 unsigned int ICL_flag;
 MAT_ALLOC(Y_omega, 3, 3);
 MAT_ALLOC(Y_omega_J, 3, 1);
-MAT_ALLOC(last_angular_velocity, 3, 1);
+MAT_ALLOC(ICL_y_omega, 3, 1);
+MAT_ALLOC(ICL_M_hat, 3, 1);
+MAT_ALLOC(ICL_control_term, 3, 1);
 
+int ICL_index = 0;
+bool ICL_isfull = false;
+int ICL_sigma_index = 0;
 
+ICL_integral ICL_integral_array[ICL_INTEGRAL_TIMES];
+ICL_sigma sigma_array[ICL_N];
 
-ICL_sigma_t sigma_array;
+double ICL_y;
+MAT_ALLOC(ICL_y_omega, 3, 1);
 
 void geometry_ctrl_init(void)
 {
@@ -152,14 +163,24 @@ void geometry_ctrl_init(void)
 
 //adaptive & ICL parameters
 	MAT_INIT(theta, 3, 1);
-	mat_data(theta)[0] = 0.0f;
-	mat_data(theta)[1] = 0.0f;
+	mat_data(theta)[0] = 0.03f;
+	mat_data(theta)[1] = 0.03f;
 	mat_data(theta)[2] = 0.0f;
 	MAT_INIT(theta_hat_dot, 3, 1);
 	MAT_INIT(Y_omega, 3, 3);
 	MAT_INIT(Y_omega_J, 3, 1);
-	MAT_INIT(last_angular_velocity, 3, 1);
-
+	MAT_INIT(ICL_y_omega, 3, 1);
+	MAT_INIT(ICL_M_hat, 3, 1);
+	MAT_INIT(ICL_control_term, 3, 1);
+	for( int i = 0 ; i<ICL_INTEGRAL_TIMES ; i++ ){
+			MAT_INIT(ICL_integral_array[i].M,3,1);
+			MAT_INIT(ICL_integral_array[i].y_omega_J,3,1);
+			MAT_INIT(ICL_integral_array[i].W,3,1);
+	}
+	for( int i = 0 ; i<ICL_N ; i++ ){
+			MAT_INIT(sigma_array[i].y_omega,3,1);
+			MAT_INIT(sigma_array[i].M_hat,3,1);
+	}
 	/* modify local variables when user change them via ground station */
 	set_sys_param_update_var_addr(MR_GEO_GAIN_ROLL_P, &krx);
 	set_sys_param_update_var_addr(MR_GEO_GAIN_ROLL_D, &kwx);
@@ -496,7 +517,6 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0];
 	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1];
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
-
 #elif (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_ADAPTIVE)
 	/* control input M1, M2, M3 */
 	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0]
@@ -511,7 +531,7 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mat_data(theta_hat_dot)[2] = adaptive_gamma* *output_force*(mat_data(eR)[2] + c2*mat_data(eW)[2]);
 	MAT_ADD(&theta,&theta_hat_dot,&theta);
 	mat_data(theta)[2] = 0;
-#elif (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_ADAPTIVE)	
+#elif (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_ICL)	
 	/* control input M1, M2, M3 */
 	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0]
 						- mat_data(theta)[0]* *output_force;
@@ -520,8 +540,114 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
 	
 	/*ICL*/
+	mat_data(Y_omega)[0*3 + 0] = 0; 
+	mat_data(Y_omega)[1*3 + 0] = mat_data(W)[0]*mat_data(W)[2]; 
+	mat_data(Y_omega)[2*3 + 0] = -mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y_omega)[0*3 + 1] = -mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y_omega)[1*3 + 1] = 0;
+	mat_data(Y_omega)[2*3 + 1] = mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y_omega)[0*3 + 2] = mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y_omega)[1*3 + 2] = -mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y_omega)[2*3 + 2] = 0; 
 		
-	mat_data(theta)[2] = 0;
+	MAT_ALLOC(J_diag, 3, 1);
+	MAT_INIT(J_diag, 3, 1);
+	mat_data(J_diag)[0] = mat_data(J)[0*0 + 0];
+	mat_data(J_diag)[1] = mat_data(J)[1*1 + 1];
+	mat_data(J_diag)[2] = mat_data(J)[2*2 + 2];
+
+	MAT_MULT(&Y_omega, &J_diag, &Y_omega_J);
+	/* ICL integral */
+	ICL_y = ICL_y + (*output_force - ICL_integral_array[ICL_index].y)*dt;
+	mat_data(ICL_y_omega)[0] = 	mat_data(ICL_y_omega)[0] 
+								+ (mat_data(Y_omega_J)[0] - ICL_integral_array[ICL_index].mat_data(y_omega_J)[0])*dt
+								+ (mat_data(W)[0]-ICL_integral_array[ICL_index].mat_data(W)[0])*mat_data(J_diag)[0];
+
+	mat_data(ICL_y_omega)[1] = 	mat_data(ICL_y_omega)[1] 
+								+ (mat_data(Y_omega_J)[1] - ICL_integral_array[ICL_index].mat_data(y_omega_J)[1])*dt
+								+ (mat_data(W)[1]-ICL_integral_array[ICL_index].mat_data(W)[1])*mat_data(J_diag)[1];
+	
+	mat_data(ICL_y_omega)[2] = 	mat_data(ICL_y_omega)[2] 
+								+ (mat_data(Y_omega_J)[2] - ICL_integral_array[ICL_index].mat_data(y_omega_J)[2])*dt
+								+ (mat_data(W)[2]-ICL_integral_array[ICL_index].mat_data(W)[2])*mat_data(J_diag)[2];
+	
+	mat_data(ICL_M_hat)[0] = mat_data(ICL_M_hat)[0] 
+							+( output_moments[0] - ICL_integral_array[ICL_index].mat_data(M)[0] )*dt;
+	mat_data(ICL_M_hat)[1] = mat_data(ICL_M_hat)[1] 
+							+( output_moments[1] - ICL_integral_array[ICL_index].mat_data(M)[1] )*dt;
+	mat_data(ICL_M_hat)[2] = mat_data(ICL_M_hat)[2] 
+							+( output_moments[2] - ICL_integral_array[ICL_index].mat_data(M)[2] )*dt;
+
+	// update integral array
+	ICL_index ++;
+	if(ICL_index == ICL_INTEGRAL_TIMES){
+		ICL_index = 0;
+	}
+
+	ICL_integral_array[ICL_index].y = *output_force;
+	ICL_integral_array[ICL_index].mat_data(y_omega_J)[0] = mat_data(Y_omega_J)[0];
+	ICL_integral_array[ICL_index].mat_data(y_omega_J)[1] = mat_data(Y_omega_J)[1];
+	ICL_integral_array[ICL_index].mat_data(y_omega_J)[2] = mat_data(Y_omega_J)[2];
+	ICL_integral_array[ICL_index].mat_data(M)[0] = output_moments[0];
+	ICL_integral_array[ICL_index].mat_data(M)[1] = output_moments[1];
+	ICL_integral_array[ICL_index].mat_data(M)[2] = output_moments[2];
+	//update sigma array
+	ICL_sigma_index ++;
+	if(	ICL_sigma_index == ICL_N){
+		ICL_sigma_index = 0;
+	}
+	
+	sigma_array[ICL_sigma_index].y = ICL_y;
+	sigma_array[ICL_sigma_index].mat_data(y_omega)[0] = mat_data(ICL_y_omega)[0];
+	sigma_array[ICL_sigma_index].mat_data(y_omega)[1] = mat_data(ICL_y_omega)[1];
+	sigma_array[ICL_sigma_index].mat_data(y_omega)[2] = mat_data(ICL_y_omega)[2];
+	sigma_array[ICL_sigma_index].mat_data(M_hat)[0] = mat_data(ICL_M_hat)[0];
+	sigma_array[ICL_sigma_index].mat_data(M_hat)[1] = mat_data(ICL_M_hat)[1];
+	sigma_array[ICL_sigma_index].mat_data(M_hat)[2] = mat_data(ICL_M_hat)[2];
+	mat_data(ICL_control_term)[0] = 0;
+	mat_data(ICL_control_term)[1] = 0;
+	mat_data(ICL_control_term)[2] = 0;
+
+//============= calculate ICL sigma control term ===============
+	for(int i = 0 ; i<ICL_N ; i++){
+		mat_data(ICL_control_term)[0] = mat_data(ICL_control_term)[0] 
+										+ sigma_array[i].y*( sigma_array[i].mat_data(y_omega)[0]
+															- sigma_array[i].mat_data(M_hat)[0]
+															- sigma_array[i].y*mat_data(theta)[0]);
+		mat_data(ICL_control_term)[1] = mat_data(ICL_control_term)[1] 
+										+ sigma_array[i].y*( sigma_array[i].mat_data(y_omega)[1]
+															- sigma_array[i].mat_data(M_hat)[1]
+															- sigma_array[i].y*mat_data(theta)[1]);
+		mat_data(ICL_control_term)[2] = mat_data(ICL_control_term)[2] 
+										+ sigma_array[i].y*( sigma_array[i].mat_data(y_omega)[2]
+															- sigma_array[i].mat_data(M_hat)[2]
+															- sigma_array[i].y*mat_data(theta)[2]);
+	}
+//=============== update theta ===============
+	if(ICL_isfull == false){
+		mat_data(theta_hat_dot)[0] = adaptive_gamma* *output_force*(mat_data(eR)[0] + c2*mat_data(eW)[0]);
+		mat_data(theta_hat_dot)[1] = adaptive_gamma* *output_force*(mat_data(eR)[1] + c2*mat_data(eW)[1]);
+		mat_data(theta_hat_dot)[2] = adaptive_gamma* *output_force*(mat_data(eR)[2] + c2*mat_data(eW)[2]);
+		MAT_ADD(&theta,&theta_hat_dot,&theta);
+		mat_data(theta)[2] = 0;
+		if(ICL_flag > ICL_N && ICL_flag > ICL_INTEGRAL_TIMES){
+			ICL_isfull = true;
+		}
+		else{
+			ICL_flag ++;
+		}
+	}
+	else{
+		mat_data(theta_hat_dot)[0] = adaptive_gamma* *output_force*(mat_data(eR)[0] + c2*mat_data(eW)[0])
+									+ adaptive_gamma * k_icl * mat_data(ICL_control_term)[0];
+		mat_data(theta_hat_dot)[1] = adaptive_gamma* *output_force*(mat_data(eR)[1] + c2*mat_data(eW)[1])
+									+ adaptive_gamma * k_icl * mat_data(ICL_control_term)[1];
+		mat_data(theta_hat_dot)[2] = adaptive_gamma* *output_force*(mat_data(eR)[2] + c2*mat_data(eW)[2])
+									+ adaptive_gamma * k_icl * mat_data(ICL_control_term)[2];
+		MAT_ADD(&theta,&theta_hat_dot,&theta);
+		mat_data(theta)[2] = 0;
+	}
+
 #endif
 
 }
