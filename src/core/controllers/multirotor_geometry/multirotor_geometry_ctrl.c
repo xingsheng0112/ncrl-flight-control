@@ -96,11 +96,11 @@ bool height_ctrl_only = false;
 //adaptive
 MAT_ALLOC(theta, 3, 1);
 MAT_ALLOC(theta_hat_dot, 3, 1);
-float adaptive_gamma = 0.000002;
+float adaptive_gamma = 0.0000028;
 float c2 = 10;
 
 //ICL
-float k_icl = 0.0005;
+float k_icl = 0.0001;
 //float k_icl = 0.000;
 unsigned int ICL_flag;
 MAT_ALLOC(Y_omega, 3, 3);
@@ -163,8 +163,8 @@ void geometry_ctrl_init(void)
 
 //adaptive & ICL parameters
 	MAT_INIT(theta, 3, 1);
-	mat_data(theta)[0] = 0.03f;
-	mat_data(theta)[1] = 0.03f;
+	mat_data(theta)[0] = 0.0f;
+	mat_data(theta)[1] = 0.0f;
 	mat_data(theta)[2] = 0.0f;
 	MAT_INIT(theta_hat_dot, 3, 1);
 	MAT_INIT(Y_omega, 3, 3);
