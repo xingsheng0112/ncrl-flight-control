@@ -216,6 +216,9 @@ void autopilot_trajectory_following_handler(void)
 			} else {
 				/* end of the mission, do hovering */
 				autopilot.mode = AUTOPILOT_HOVERING_MODE;
+				autopilot_assign_zero_vel_target();
+				autopilot_assign_zero_acc_feedforward();
+				return;
 			}
 		}
 	}
