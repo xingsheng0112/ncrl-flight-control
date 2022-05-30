@@ -95,6 +95,11 @@ void mavlink_tx_task(void *param)
 			send_mavlink_trajectory_velocity_debug();
 			send_mavlink_trajectory_acceleration_debug();
 		}
+		if(autopilot_get_mode() == AUTOPILOT_HOVERING_MODE) {
+			send_mavlink_trajectory_position_debug();
+			send_mavlink_trajectory_velocity_debug();
+			send_mavlink_trajectory_acceleration_debug();
+		}
 
 		mavlink_calibration_handler();
 
