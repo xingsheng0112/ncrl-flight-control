@@ -94,30 +94,56 @@ bool height_ctrl_only = false;
 //adaptive & ICL parameters
 
 //adaptive
-MAT_ALLOC(theta, 3, 1);
-MAT_ALLOC(theta_hat_dot, 3, 1);
-float adaptive_gamma = 0.0000028;
+MAT_ALLOC(theta, 8, 1);
+MAT_ALLOC(theta_hat_dot, 8, 1);
+MAT_ALLOC(Y, 3, 8);
+MAT_ALLOC(Yt, 8, 3);
+MAT_ALLOC(eW_c2eR, 3, 1);
+MAT_ALLOC(Yt_eW_c2eR,8,1);
+MAT_ALLOC(Ytheta,3,1);
+float adaptive_gamma[8] = {0.000005,0.000005,0.000028,0.000028,0.000005,0.0000028,0.00000028,0.00000028};
+
 float c2 = 10;
 
 //ICL
-float k_icl = 0.0001;
-//float k_icl = 0.000;
-unsigned int ICL_flag;
-MAT_ALLOC(Y_omega, 3, 3);
-MAT_ALLOC(Y_omega_J, 3, 1);
-MAT_ALLOC(ICL_y_omega, 3, 1);
-MAT_ALLOC(ICL_M_hat, 3, 1);
-MAT_ALLOC(ICL_control_term, 3, 1);
+MAT_ALLOC(adaptive_theta_hat_dot, 8, 1);
+MAT_ALLOC(ICL_theta_hat_dot, 8, 1);
+MAT_ALLOC(W_last,3,1);
+MAT_ALLOC(W_last2,3,1);
+MAT_ALLOC(W_last3,3,1);
+MAT_ALLOC(W_last4,3,1);
+MAT_ALLOC(W_last5,3,1);
+MAT_ALLOC(W_dot,3,1);
+MAT_ALLOC(Y1_Y_W, 3, 8);
+MAT_ALLOC(Y1_Y_Wdt,3,8);
+MAT_ALLOC(W_dot_Matrix, 3, 8);
+MAT_ALLOC(M_last,3,1);
+MAT_ALLOC(M_last2,3,1);
+MAT_ALLOC(M_last3,3,1);
+MAT_ALLOC(M_last4,3,1);
+MAT_ALLOC(M_last5,3,1);
+MAT_ALLOC(Mb,3,1);
+MAT_ALLOC(y_cl,3,8);
+//sigma
+MAT_ALLOC(ICL_control_term, 8, 1);	//x
+MAT_ALLOC(y_cltheta,3,1);			//y_cl*theta
+MAT_ALLOC(Mb_y_cltheta,3,1);		//Mb-y_cl*theta
+MAT_ALLOC(y_clT,8,3);				//y_cl.transpose
+MAT_ALLOC(y_clT_Mb_y_cltheta,8,1);	//y_clT*Mb-y_cl*theta
 
-int ICL_index = 0;
-bool ICL_isfull = false;
+float output_force_last = 0;
+float output_force_last1 = 0;
+float output_force_last2 = 0;
+float output_force_last3 = 0;
+float output_force_last4 = 0;
+float output_force_last5 = 0;
+float k_icl[8] = {0.1,0.1,1200,1200,2200, 6000, 1000, 1000};
+float adaptive_gamma_k_icl[8];
+
+
 int ICL_sigma_index = 0;
-
-ICL_integral ICL_integral_array[ICL_INTEGRAL_TIMES];
 ICL_sigma sigma_array[ICL_N];
 
-double ICL_y;
-MAT_ALLOC(ICL_y_omega, 3, 1);
 
 void geometry_ctrl_init(void)
 {
@@ -162,24 +188,100 @@ void geometry_ctrl_init(void)
 	MAT_INIT(b3d, 3, 1);
 
 //adaptive & ICL parameters
-	MAT_INIT(theta, 3, 1);
+//adaptive
+	MAT_INIT(theta, 8, 1);
+	/*
+	mat_data(theta)[0] = 0.04f;
+	mat_data(theta)[1] = 0.04f;
+	mat_data(theta)[2] = 0.02f;
+	mat_data(theta)[3] = 0.02f;
+	mat_data(theta)[4] = 0.1f;
+	mat_data(theta)[5] = 0.002f;
+	mat_data(theta)[6] = 0.002f;
+	mat_data(theta)[7] = 0.002f;
+	*/
 	mat_data(theta)[0] = 0.0f;
 	mat_data(theta)[1] = 0.0f;
 	mat_data(theta)[2] = 0.0f;
-	MAT_INIT(theta_hat_dot, 3, 1);
-	MAT_INIT(Y_omega, 3, 3);
-	MAT_INIT(Y_omega_J, 3, 1);
-	MAT_INIT(ICL_y_omega, 3, 1);
-	MAT_INIT(ICL_M_hat, 3, 1);
-	MAT_INIT(ICL_control_term, 3, 1);
-	for( int i = 0 ; i<ICL_INTEGRAL_TIMES ; i++ ){
-			MAT_INIT(ICL_integral_array[i].M,3,1);
-			MAT_INIT(ICL_integral_array[i].y_omega_J,3,1);
-			MAT_INIT(ICL_integral_array[i].W,3,1);
-	}
+	mat_data(theta)[3] = 0.0f;
+	mat_data(theta)[4] = 0.0f;
+	mat_data(theta)[5] = 0.0f;
+	mat_data(theta)[6] = 0.0f;
+	mat_data(theta)[7] = 0.0f;
+	MAT_INIT(theta_hat_dot, 8, 1);
+	MAT_INIT(Y, 3, 8);
+	MAT_INIT(Yt, 8, 3);
+	MAT_INIT(eW_c2eR, 3, 1);
+	MAT_INIT(Yt_eW_c2eR,8,1);
+	MAT_INIT(Ytheta,3,1);
+//ICL
+	MAT_INIT(adaptive_theta_hat_dot, 8, 1);
+	MAT_INIT(ICL_theta_hat_dot, 8, 1);
+	MAT_INIT(W_last,3,1);
+	MAT_INIT(W_last2,3,1);
+	MAT_INIT(W_last3,3,1);
+	MAT_INIT(W_last4,3,1);
+	MAT_INIT(W_last5,3,1);
+	mat_data(W_last)[0] = 0;
+	mat_data(W_last)[1] = 0;
+	mat_data(W_last)[2] = 0;
+	mat_data(W_last2)[0] = 0;
+	mat_data(W_last2)[1] = 0;
+	mat_data(W_last2)[2] = 0;
+	mat_data(W_last3)[0] = 0;
+	mat_data(W_last3)[1] = 0;
+	mat_data(W_last3)[2] = 0;
+	mat_data(W_last4)[0] = 0;
+	mat_data(W_last4)[1] = 0;
+	mat_data(W_last4)[2] = 0;
+	mat_data(W_last5)[0] = 0;
+	mat_data(W_last5)[1] = 0;
+	mat_data(W_last5)[2] = 0;
+	MAT_INIT(Y1_Y_W, 3, 8);
+	MAT_INIT(Y1_Y_Wdt,3,8);
+	MAT_INIT(W_dot,3,1);
+	MAT_INIT(W_dot_Matrix, 3, 8);
+	MAT_INIT(M_last,3,1);
+	MAT_INIT(M_last2,3,1);
+	MAT_INIT(M_last3,3,1);
+	MAT_INIT(M_last4,3,1);
+	MAT_INIT(M_last5,3,1);
+	mat_data(M_last)[0] = 0;
+	mat_data(M_last)[1] = 0;
+	mat_data(M_last)[2] = 0;
+	mat_data(M_last2)[0] = 0;
+	mat_data(M_last2)[1] = 0;
+	mat_data(M_last2)[2] = 0;
+	mat_data(M_last3)[0] = 0;
+	mat_data(M_last3)[1] = 0;
+	mat_data(M_last3)[2] = 0;
+	mat_data(M_last4)[0] = 0;
+	mat_data(M_last4)[1] = 0;
+	mat_data(M_last4)[2] = 0;
+	mat_data(M_last5)[0] = 0;
+	mat_data(M_last5)[1] = 0;
+	mat_data(M_last5)[2] = 0;
+	MAT_INIT(Mb,3,1);
+	MAT_INIT(y_cl,3,8);
+	MAT_INIT(ICL_control_term, 8, 1);	//x
+	MAT_INIT(y_cltheta,3,1);			//y_cl*theta
+	MAT_INIT(Mb_y_cltheta,3,1);			//Mb-y_cl*theta
+	MAT_INIT(y_clT,8,3);				//y_cl.transpose
+	MAT_INIT(y_clT_Mb_y_cltheta,8,1);	//y_clT*Mb-y_cl*theta
+
 	for( int i = 0 ; i<ICL_N ; i++ ){
-			MAT_INIT(sigma_array[i].y_omega,3,1);
-			MAT_INIT(sigma_array[i].M_hat,3,1);
+			MAT_INIT(sigma_array[i].y_cl,3,8);
+			MAT_INIT(sigma_array[i].Mb,3,1);
+			
+			for( int j = 0 ; j<3*8 ; j++){
+				sigma_array[i].mat_data(y_cl)[j] = 0;
+			}	
+			sigma_array[i].mat_data(Mb)[0] = 0;
+			sigma_array[i].mat_data(Mb)[1] = 0;
+			sigma_array[i].mat_data(Mb)[2] = 0;
+	}
+	for( int i = 0 ; i<8 ; i++ ){
+		adaptive_gamma_k_icl[i] = adaptive_gamma[i]*k_icl[i];
 	}
 	/* modify local variables when user change them via ground station */
 	set_sys_param_update_var_addr(MR_GEO_GAIN_ROLL_P, &krx);
@@ -518,136 +620,323 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1];
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
 #elif (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_ADAPTIVE)
-	/* control input M1, M2, M3 */
-	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0]
-						- mat_data(theta)[0]* *output_force;
-	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1]
-						- mat_data(theta)[1]* *output_force;
-	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
 	
 	/*adaptive*/	
-	mat_data(theta_hat_dot)[0] = adaptive_gamma* *output_force*(mat_data(eR)[0] + c2*mat_data(eW)[0]);
-	mat_data(theta_hat_dot)[1] = adaptive_gamma* *output_force*(mat_data(eR)[1] + c2*mat_data(eW)[1]);
-	mat_data(theta_hat_dot)[2] = adaptive_gamma* *output_force*(mat_data(eR)[2] + c2*mat_data(eW)[2]);
-	MAT_ADD(&theta,&theta_hat_dot,&theta);
-	mat_data(theta)[2] = 0;
-#elif (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_ICL)	
+	//Y1 of Y
+	// [0	-f	]
+	// [f	0	]
+	// [0	0	]
+	mat_data(Y)[0*8 + 0] = 0; 
+	mat_data(Y)[1*8 + 0] = *output_force; 
+	mat_data(Y)[2*8 + 0] = 0;
+	mat_data(Y)[0*8 + 1] = -*output_force; 
+	mat_data(Y)[1*8 + 1] = 0; 
+	mat_data(Y)[2*8 + 1] = 0;
+	//Y2 of Y
+	//wb: omega_bar
+	//w: angular velocity
+	//[-wb1		,-w1*w2	,w1*w2	,-wb1-w0*w2	,-wb2+w0*w1	,-w2^2+w1^2	]
+	//[w0*w2	,-wb1	,-w0*w2	,-wb0+w1*w2	,-w0^2+w2^2	,-wb2-w0*w1	]
+	//[-w0*w1	,w0*w1	,--wb2	,-w1^2+w0^2	,-wb0-w1*w2	,-wb1+w0*w2	]
+	mat_data(Y)[0*8 + 2] = 0; 
+	mat_data(Y)[1*8 + 2] = mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 2] = -mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[0*8 + 3] = -mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[1*8 + 3] = 0;
+	mat_data(Y)[2*8 + 3] = mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[0*8 + 4] = mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[1*8 + 4] = -mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 4] = 0;
+	mat_data(Y)[0*8 + 5] = -mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y)[1*8 + 5] = mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 5] = -mat_data(W)[1]*mat_data(W)[1] +mat_data(W)[0]*mat_data(W)[0];
+	mat_data(Y)[0*8 + 6] = mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[1*8 + 6] = -mat_data(W)[0]*mat_data(W)[0] +mat_data(W)[2]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 6] = -mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[0*8 + 7] = -mat_data(W)[2]*mat_data(W)[2] +mat_data(W)[1]*mat_data(W)[1];
+	mat_data(Y)[1*8 + 7] = -mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[2*8 + 7] = mat_data(W)[0]*mat_data(W)[2];
+	//Yt*(eW_c2eR)	
+	MAT_TRANS(&Y, &Yt);
+	mat_data(eW_c2eR)[0] = c2*mat_data(eR)[0] + mat_data(eW)[0];
+	mat_data(eW_c2eR)[1] = c2*mat_data(eR)[1] + mat_data(eW)[1];
+	mat_data(eW_c2eR)[2] = c2*mat_data(eR)[2] + mat_data(eW)[2];	
+	MAT_MULT(&Yt,&eW_c2eR,&Yt_eW_c2eR);
+	
+	//adaptivetheta_hat_dot 
+	for(int i = 0 ; i<8 ; i++){
+		mat_data(theta_hat_dot)[i] = -adaptive_gamma[i]*mat_data(Yt_eW_c2eR)[i];
+	}
+	//theta update
+	mat_data(theta)[0] = mat_data(theta)[0] + mat_data(theta_hat_dot)[0];
+	mat_data(theta)[1] = mat_data(theta)[1] + mat_data(theta_hat_dot)[1];
+	mat_data(theta)[2] = mat_data(theta)[2] + mat_data(theta_hat_dot)[2];
+	mat_data(theta)[3] = mat_data(theta)[3] + mat_data(theta_hat_dot)[3];
+	mat_data(theta)[4] = mat_data(theta)[4] + mat_data(theta_hat_dot)[4];
+	mat_data(theta)[5] = mat_data(theta)[5] + mat_data(theta_hat_dot)[5];
+	mat_data(theta)[6] = mat_data(theta)[6] + mat_data(theta_hat_dot)[6];
+	mat_data(theta)[7] = mat_data(theta)[7] + mat_data(theta_hat_dot)[7];
+
+	//Y_theta
+	MAT_MULT(&Y, &theta, &Ytheta);
+	
 	/* control input M1, M2, M3 */
-	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0]
-						- mat_data(theta)[0]* *output_force;
-	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1]
-						- mat_data(theta)[1]* *output_force;
-	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
+	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] +mat_data(Ytheta)[0]; 
+	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] +mat_data(Ytheta)[1];
+	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] +mat_data(Ytheta)[2];
+#elif (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_ICL)
+#pragma "ICL"	
+	/*adaptive*/	
+	//Y1 of Y
+	// [0	-f	]
+	// [f	0	]
+	// [0	0	]
+	//
+	mat_data(Y)[0*8 + 0] = 0; 
+	mat_data(Y)[1*8 + 0] = *output_force; 
+	mat_data(Y)[2*8 + 0] = 0;
+	mat_data(Y)[0*8 + 1] = -*output_force; 
+	mat_data(Y)[1*8 + 1] = 0; 
+	mat_data(Y)[2*8 + 1] = 0;
+	//Y2 of Y
+	//wb: omega_bar
+	//w: angular velocity
+	//[-wb1		,-w1*w2	,w1*w2	,-wb1-w0*w2	,-wb2+w0*w1	,-w2^2+w1^2	]
+	//[w0*w2	,-wb1	,-w0*w2	,-wb0+w1*w2	,-w0^2+w2^2	,-wb2-w0*w1	]
+	//[-w0*w1	,w0*w1	,--wb2	,-w1^2+w0^2	,-wb0-w1*w2	,-wb1+w0*w2	]
+	mat_data(Y)[0*8 + 2] = 0; 
+	mat_data(Y)[1*8 + 2] = mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 2] = -mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[0*8 + 3] = -mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[1*8 + 3] = 0;
+	mat_data(Y)[2*8 + 3] = mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[0*8 + 4] = mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[1*8 + 4] = -mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 4] = 0;
+	mat_data(Y)[0*8 + 5] = -mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y)[1*8 + 5] = mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 5] = -mat_data(W)[1]*mat_data(W)[1] +mat_data(W)[0]*mat_data(W)[0];
+	mat_data(Y)[0*8 + 6] = mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[1*8 + 6] = -mat_data(W)[0]*mat_data(W)[0] +mat_data(W)[2]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 6] = -mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[0*8 + 7] = -mat_data(W)[2]*mat_data(W)[2] +mat_data(W)[1]*mat_data(W)[1];
+	mat_data(Y)[1*8 + 7] = -mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[2*8 + 7] = mat_data(W)[0]*mat_data(W)[2];
+	// update adaptive theta
+	//Yt*(eW_c2eR)	
+	MAT_TRANS(&Y, &Yt);
+	mat_data(eW_c2eR)[0] = c2*mat_data(eR)[0] + mat_data(eW)[0];
+	mat_data(eW_c2eR)[1] = c2*mat_data(eR)[1] + mat_data(eW)[1];
+	mat_data(eW_c2eR)[2] = c2*mat_data(eR)[2] + mat_data(eW)[2];	
+	MAT_MULT(&Yt,&eW_c2eR,&Yt_eW_c2eR);
 	
+	//theta_hat_dot 
+	for(int i = 0 ; i<8 ; i++){
+		mat_data(adaptive_theta_hat_dot)[i] = -adaptive_gamma[i]*mat_data(Yt_eW_c2eR)[i];
+	}
+
 	/*ICL*/
-	mat_data(Y_omega)[0*3 + 0] = 0; 
-	mat_data(Y_omega)[1*3 + 0] = mat_data(W)[0]*mat_data(W)[2]; 
-	mat_data(Y_omega)[2*3 + 0] = -mat_data(W)[0]*mat_data(W)[1];
-	mat_data(Y_omega)[0*3 + 1] = -mat_data(W)[1]*mat_data(W)[2];
-	mat_data(Y_omega)[1*3 + 1] = 0;
-	mat_data(Y_omega)[2*3 + 1] = mat_data(W)[0]*mat_data(W)[1];
-	mat_data(Y_omega)[0*3 + 2] = mat_data(W)[1]*mat_data(W)[2];
-	mat_data(Y_omega)[1*3 + 2] = -mat_data(W)[0]*mat_data(W)[2];
-	mat_data(Y_omega)[2*3 + 2] = 0; 
-		
-	MAT_ALLOC(J_diag, 3, 1);
-	MAT_INIT(J_diag, 3, 1);
-	mat_data(J_diag)[0] = mat_data(J)[0*0 + 0];
-	mat_data(J_diag)[1] = mat_data(J)[1*1 + 1];
-	mat_data(J_diag)[2] = mat_data(J)[2*2 + 2];
-
-	MAT_MULT(&Y_omega, &J_diag, &Y_omega_J);
-	/* ICL integral */
-	ICL_y = ICL_y + (*output_force - ICL_integral_array[ICL_index].y)*dt;
-	mat_data(ICL_y_omega)[0] = 	mat_data(ICL_y_omega)[0] 
-								+ (mat_data(Y_omega_J)[0] - ICL_integral_array[ICL_index].mat_data(y_omega_J)[0])*dt
-								+ (mat_data(W)[0]-ICL_integral_array[ICL_index].mat_data(W)[0])*mat_data(J_diag)[0];
-
-	mat_data(ICL_y_omega)[1] = 	mat_data(ICL_y_omega)[1] 
-								+ (mat_data(Y_omega_J)[1] - ICL_integral_array[ICL_index].mat_data(y_omega_J)[1])*dt
-								+ (mat_data(W)[1]-ICL_integral_array[ICL_index].mat_data(W)[1])*mat_data(J_diag)[1];
+	//Y1 of Y in icl	
+	// [0	-f	]
+	// [f	0	]
+	// [0	0	]
+	//float ave_force = (output_force_last + output_force_last2 + output_force_last3 + output_force_last4 + output_force_last5 )/5;
+	mat_data(Y1_Y_W)[0*8 + 0] = 0; 
+	mat_data(Y1_Y_W)[1*8 + 0] = output_force_last5; 
+	mat_data(Y1_Y_W)[2*8 + 0] = 0;
+	mat_data(Y1_Y_W)[0*8 + 1] = -output_force_last5; 
+	mat_data(Y1_Y_W)[1*8 + 1] = 0; 
+	mat_data(Y1_Y_W)[2*8 + 1] = 0;
+	//Y W of Y in icl	
+	//w: angular velocity
+	//[0		,-w1*w2	,w1*w2	,-w0*w2		,w0*w1		,-w2^2+w1^2	]
+	//[w0*w2	,0		,-w0*w2	,w1*w2		,-w0^2+w2^2	,-w0*w1		]
+	//[-w0*w1	,w0*w1	,0		,-w1^2+w0^2	,-w1*w2		,w0*w2		]
+	/*
+	float W0 = (mat_data(W_last)[0] + mat_data(W_last2)[0] + mat_data(W_last3)[0] + mat_data(W_last4)[0] + mat_data(W_last5)[0])/5;
+	float W1 = (mat_data(W_last)[1] + mat_data(W_last2)[1] + mat_data(W_last3)[1] + mat_data(W_last4)[1] + mat_data(W_last5)[1])/5;
+	float W2 = (mat_data(W_last)[2] + mat_data(W_last2)[2] + mat_data(W_last3)[2] + mat_data(W_last4)[2] + mat_data(W_last5)[2])/5;
 	
-	mat_data(ICL_y_omega)[2] = 	mat_data(ICL_y_omega)[2] 
-								+ (mat_data(Y_omega_J)[2] - ICL_integral_array[ICL_index].mat_data(y_omega_J)[2])*dt
-								+ (mat_data(W)[2]-ICL_integral_array[ICL_index].mat_data(W)[2])*mat_data(J_diag)[2];
+	mat_data(Y1_Y_W)[0*8 + 2] = 0; 
+	mat_data(Y1_Y_W)[1*8 + 2] = W0*W2;
+	mat_data(Y1_Y_W)[2*8 + 2] = -W0*W1;
+	mat_data(Y1_Y_W)[0*8 + 3] = -W1*W2;
+	mat_data(Y1_Y_W)[1*8 + 3] = 0;
+	mat_data(Y1_Y_W)[2*8 + 3] = W0*W1;
+	mat_data(Y1_Y_W)[0*8 + 4] = W1*W2;
+	mat_data(Y1_Y_W)[1*8 + 4] = -W0*W2;
+	mat_data(Y1_Y_W)[2*8 + 4] = 0;
+	mat_data(Y1_Y_W)[0*8 + 5] = -W0*W2;
+	mat_data(Y1_Y_W)[1*8 + 5] = W1*W2;
+	mat_data(Y1_Y_W)[2*8 + 5] = -W1*W1 + W0*W0;
+	mat_data(Y1_Y_W)[0*8 + 6] = W0*W1;
+	mat_data(Y1_Y_W)[1*8 + 6] = -W0*W0 + W2*W2;
+	mat_data(Y1_Y_W)[2*8 + 6] = -W1*W2;
+	mat_data(Y1_Y_W)[0*8 + 7] = -W2*W2 + W1*W1;
+	mat_data(Y1_Y_W)[1*8 + 7] = -W0*W1;
+	mat_data(Y1_Y_W)[2*8 + 7] = W0*W2;
+	*/
+	mat_data(Y1_Y_W)[0*8 + 2] = 0; 
+	mat_data(Y1_Y_W)[1*8 + 2] = mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y1_Y_W)[2*8 + 2] = -mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y1_Y_W)[0*8 + 3] = -mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y1_Y_W)[1*8 + 3] = 0;
+	mat_data(Y1_Y_W)[2*8 + 3] = mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y1_Y_W)[0*8 + 4] = mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y1_Y_W)[1*8 + 4] = -mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y1_Y_W)[2*8 + 4] = 0;
+	mat_data(Y1_Y_W)[0*8 + 5] = -mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y1_Y_W)[1*8 + 5] = mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y1_Y_W)[2*8 + 5] = -mat_data(W)[1]*mat_data(W)[1] +mat_data(W)[0]*mat_data(W)[0];
+	mat_data(Y1_Y_W)[0*8 + 6] = mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y1_Y_W)[1*8 + 6] = -mat_data(W)[0]*mat_data(W)[0] +mat_data(W)[2]*mat_data(W)[2];
+	mat_data(Y1_Y_W)[2*8 + 6] = -mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y1_Y_W)[0*8 + 7] = -mat_data(W)[2]*mat_data(W)[2] +mat_data(W)[1]*mat_data(W)[1];
+	mat_data(Y1_Y_W)[1*8 + 7] = -mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y1_Y_W)[2*8 + 7] = mat_data(W)[0]*mat_data(W)[2];
 	
-	mat_data(ICL_M_hat)[0] = mat_data(ICL_M_hat)[0] 
-							+( output_moments[0] - ICL_integral_array[ICL_index].mat_data(M)[0] )*dt;
-	mat_data(ICL_M_hat)[1] = mat_data(ICL_M_hat)[1] 
-							+( output_moments[1] - ICL_integral_array[ICL_index].mat_data(M)[1] )*dt;
-	mat_data(ICL_M_hat)[2] = mat_data(ICL_M_hat)[2] 
-							+( output_moments[2] - ICL_integral_array[ICL_index].mat_data(M)[2] )*dt;
-
-	// update integral array
-	ICL_index ++;
-	if(ICL_index == ICL_INTEGRAL_TIMES){
-		ICL_index = 0;
-	}
-
-	ICL_integral_array[ICL_index].y = *output_force;
-	ICL_integral_array[ICL_index].mat_data(y_omega_J)[0] = mat_data(Y_omega_J)[0];
-	ICL_integral_array[ICL_index].mat_data(y_omega_J)[1] = mat_data(Y_omega_J)[1];
-	ICL_integral_array[ICL_index].mat_data(y_omega_J)[2] = mat_data(Y_omega_J)[2];
-	ICL_integral_array[ICL_index].mat_data(M)[0] = output_moments[0];
-	ICL_integral_array[ICL_index].mat_data(M)[1] = output_moments[1];
-	ICL_integral_array[ICL_index].mat_data(M)[2] = output_moments[2];
+	MAT_SUB(&W, &W_last5, &W_dot);
+	mat_data(W_dot_Matrix)[0*8 + 0] = 0; 
+	mat_data(W_dot_Matrix)[1*8 + 0] = 0;
+	mat_data(W_dot_Matrix)[2*8 + 0] = 0;
+	mat_data(W_dot_Matrix)[0*8 + 1] = 0; 
+	mat_data(W_dot_Matrix)[1*8 + 1] = 0;
+	mat_data(W_dot_Matrix)[2*8 + 1] = 0;
+	mat_data(W_dot_Matrix)[0*8 + 2] = mat_data(W_dot)[0]; 
+	mat_data(W_dot_Matrix)[1*8 + 2] = 0;
+	mat_data(W_dot_Matrix)[2*8 + 2] = 0;
+	mat_data(W_dot_Matrix)[0*8 + 3] = 0;
+	mat_data(W_dot_Matrix)[1*8 + 3] = mat_data(W_dot)[1];
+	mat_data(W_dot_Matrix)[2*8 + 3] = 0;
+	mat_data(W_dot_Matrix)[0*8 + 4] = 0;
+	mat_data(W_dot_Matrix)[1*8 + 4] = 0;
+	mat_data(W_dot_Matrix)[2*8 + 4] = mat_data(W_dot)[2];
+	mat_data(W_dot_Matrix)[0*8 + 5] = mat_data(W_dot)[1];
+	mat_data(W_dot_Matrix)[1*8 + 5] = mat_data(W_dot)[0];
+	mat_data(W_dot_Matrix)[2*8 + 5] = 0;
+	mat_data(W_dot_Matrix)[0*8 + 6] = mat_data(W_dot)[2];
+	mat_data(W_dot_Matrix)[1*8 + 6] = 0;
+	mat_data(W_dot_Matrix)[2*8 + 6] = mat_data(W_dot)[0];
+	mat_data(W_dot_Matrix)[0*8 + 7] = 0;
+	mat_data(W_dot_Matrix)[1*8 + 7] = mat_data(W_dot)[2];
+	mat_data(W_dot_Matrix)[2*8 + 7] = mat_data(W_dot)[1];
+	
+	//Y1_Y_Wdt = Y1_Y
+	MAT_SCALE(&Y1_Y_W, dt*5, &Y1_Y_Wdt);
+	
 	//update sigma array
+	//y_cl & Mdt
+	/*
+	MAT_ALLOC(M_ave,3,1);	
+	MAT_INIT(M_ave,3,1);	
+	mat_data(M_ave)[0] = (mat_data(M_last)[0] + mat_data(M_last2)[0] + mat_data(M_last3)[0] + mat_data(M_last4)[0] + mat_data(M_last5)[0])/5;
+	mat_data(M_ave)[1] = (mat_data(M_last)[1] + mat_data(M_last2)[1] + mat_data(M_last3)[1] + mat_data(M_last4)[1] + mat_data(M_last5)[1])/5;
+	mat_data(M_ave)[2] = (mat_data(M_last)[2] + mat_data(M_last2)[2] + mat_data(M_last3)[2] + mat_data(M_last4)[2] + mat_data(M_last5)[2])/5;
+	*/
+	MAT_ADD(&Y1_Y_Wdt ,&W_dot_Matrix ,&sigma_array[ICL_sigma_index].y_cl );
+	MAT_SCALE(&M_last5, dt*5, &sigma_array[ICL_sigma_index].Mb);
 	ICL_sigma_index ++;
-	if(	ICL_sigma_index == ICL_N){
-		ICL_sigma_index = 0;
-	}
-	
-	sigma_array[ICL_sigma_index].y = ICL_y;
-	sigma_array[ICL_sigma_index].mat_data(y_omega)[0] = mat_data(ICL_y_omega)[0];
-	sigma_array[ICL_sigma_index].mat_data(y_omega)[1] = mat_data(ICL_y_omega)[1];
-	sigma_array[ICL_sigma_index].mat_data(y_omega)[2] = mat_data(ICL_y_omega)[2];
-	sigma_array[ICL_sigma_index].mat_data(M_hat)[0] = mat_data(ICL_M_hat)[0];
-	sigma_array[ICL_sigma_index].mat_data(M_hat)[1] = mat_data(ICL_M_hat)[1];
-	sigma_array[ICL_sigma_index].mat_data(M_hat)[2] = mat_data(ICL_M_hat)[2];
+	ICL_sigma_index %= ICL_N;
+
+//============= calculate ICL sigma control term ===============
 	mat_data(ICL_control_term)[0] = 0;
 	mat_data(ICL_control_term)[1] = 0;
 	mat_data(ICL_control_term)[2] = 0;
+	mat_data(ICL_control_term)[3] = 0;
+	mat_data(ICL_control_term)[4] = 0;
+	mat_data(ICL_control_term)[5] = 0;
+	mat_data(ICL_control_term)[6] = 0;
+	mat_data(ICL_control_term)[7] = 0;
 
-//============= calculate ICL sigma control term ===============
 	for(int i = 0 ; i<ICL_N ; i++){
-		mat_data(ICL_control_term)[0] = mat_data(ICL_control_term)[0] 
-										+ sigma_array[i].y*( sigma_array[i].mat_data(y_omega)[0]
-															- sigma_array[i].mat_data(M_hat)[0]
-															- sigma_array[i].y*mat_data(theta)[0]);
-		mat_data(ICL_control_term)[1] = mat_data(ICL_control_term)[1] 
-										+ sigma_array[i].y*( sigma_array[i].mat_data(y_omega)[1]
-															- sigma_array[i].mat_data(M_hat)[1]
-															- sigma_array[i].y*mat_data(theta)[1]);
-		mat_data(ICL_control_term)[2] = mat_data(ICL_control_term)[2] 
-										+ sigma_array[i].y*( sigma_array[i].mat_data(y_omega)[2]
-															- sigma_array[i].mat_data(M_hat)[2]
-															- sigma_array[i].y*mat_data(theta)[2]);
-	}
-//=============== update theta ===============
-	if(ICL_isfull == false){
-		mat_data(theta_hat_dot)[0] = adaptive_gamma* *output_force*(mat_data(eR)[0] + c2*mat_data(eW)[0]);
-		mat_data(theta_hat_dot)[1] = adaptive_gamma* *output_force*(mat_data(eR)[1] + c2*mat_data(eW)[1]);
-		mat_data(theta_hat_dot)[2] = adaptive_gamma* *output_force*(mat_data(eR)[2] + c2*mat_data(eW)[2]);
-		MAT_ADD(&theta,&theta_hat_dot,&theta);
-		mat_data(theta)[2] = 0;
-		if(ICL_flag > ICL_N && ICL_flag > ICL_INTEGRAL_TIMES){
-			ICL_isfull = true;
-		}
-		else{
-			ICL_flag ++;
-		}
-	}
-	else{
-		mat_data(theta_hat_dot)[0] = adaptive_gamma* *output_force*(mat_data(eR)[0] + c2*mat_data(eW)[0])
-									+ adaptive_gamma * k_icl * mat_data(ICL_control_term)[0];
-		mat_data(theta_hat_dot)[1] = adaptive_gamma* *output_force*(mat_data(eR)[1] + c2*mat_data(eW)[1])
-									+ adaptive_gamma * k_icl * mat_data(ICL_control_term)[1];
-		mat_data(theta_hat_dot)[2] = adaptive_gamma* *output_force*(mat_data(eR)[2] + c2*mat_data(eW)[2])
-									+ adaptive_gamma * k_icl * mat_data(ICL_control_term)[2];
-		MAT_ADD(&theta,&theta_hat_dot,&theta);
-		mat_data(theta)[2] = 0;
-	}
+		//y_cl.T*(Mb - y_cl_theta)	
+		/*
+		ICL_control_term, 8, 1		//x
+		y_cltheta ,3, ,1			//y_cl*theta
+		Mb_y_cltheta ,3 ,1			//Mb-y_cl*theta
+		y_clT ,8 ,3					//y_cl.transpose
+		y_clT_Mb_y_cltheta ,8 ,1	//y_clT*Mb-y_cl*theta
+		*/
+		//y_cl_theta
+		MAT_MULT(&sigma_array[i].y_cl, &theta, &y_cltheta);
+		//Mb - y_cl_theta
+		MAT_SUB(&sigma_array[i].Mb, &y_cltheta, &Mb_y_cltheta);
+		//y_cl.T*(Mb - y_cl_theta)	
+		MAT_TRANS(&sigma_array[i].y_cl,&y_clT);
+		MAT_MULT(&y_clT, &Mb_y_cltheta, &y_clT_Mb_y_cltheta);
 
+		mat_data(ICL_control_term)[0] = mat_data(ICL_control_term)[0] + mat_data(y_clT_Mb_y_cltheta)[0]; 
+		mat_data(ICL_control_term)[1] = mat_data(ICL_control_term)[1] + mat_data(y_clT_Mb_y_cltheta)[1];
+		mat_data(ICL_control_term)[2] = mat_data(ICL_control_term)[2] + mat_data(y_clT_Mb_y_cltheta)[2];
+		mat_data(ICL_control_term)[3] = mat_data(ICL_control_term)[3] + mat_data(y_clT_Mb_y_cltheta)[3];
+		mat_data(ICL_control_term)[4] = mat_data(ICL_control_term)[4] + mat_data(y_clT_Mb_y_cltheta)[4];
+		mat_data(ICL_control_term)[5] = mat_data(ICL_control_term)[5] + mat_data(y_clT_Mb_y_cltheta)[5];
+		mat_data(ICL_control_term)[6] = mat_data(ICL_control_term)[6] + mat_data(y_clT_Mb_y_cltheta)[6];
+		mat_data(ICL_control_term)[7] = mat_data(ICL_control_term)[7] + mat_data(y_clT_Mb_y_cltheta)[7];
+	}
+	mat_data(ICL_theta_hat_dot)[0] = adaptive_gamma_k_icl[0]*mat_data(ICL_control_term)[0];
+	mat_data(ICL_theta_hat_dot)[1] = adaptive_gamma_k_icl[1]*mat_data(ICL_control_term)[1];
+	mat_data(ICL_theta_hat_dot)[2] = adaptive_gamma_k_icl[2]*mat_data(ICL_control_term)[2];
+	mat_data(ICL_theta_hat_dot)[3] = adaptive_gamma_k_icl[3]*mat_data(ICL_control_term)[3];
+	mat_data(ICL_theta_hat_dot)[4] = adaptive_gamma_k_icl[4]*mat_data(ICL_control_term)[4];
+	mat_data(ICL_theta_hat_dot)[5] = adaptive_gamma_k_icl[5]*mat_data(ICL_control_term)[5];
+	mat_data(ICL_theta_hat_dot)[6] = adaptive_gamma_k_icl[6]*mat_data(ICL_control_term)[6];
+	mat_data(ICL_theta_hat_dot)[7] = adaptive_gamma_k_icl[7]*mat_data(ICL_control_term)[7];
+
+	//theta update
+	mat_data(theta)[0] = mat_data(theta)[0] + mat_data(adaptive_theta_hat_dot)[0] + mat_data(ICL_theta_hat_dot)[0];
+	mat_data(theta)[1] = mat_data(theta)[1] + mat_data(adaptive_theta_hat_dot)[1] + mat_data(ICL_theta_hat_dot)[1];
+	mat_data(theta)[2] = mat_data(theta)[2] + mat_data(adaptive_theta_hat_dot)[2] + mat_data(ICL_theta_hat_dot)[2];
+	mat_data(theta)[3] = mat_data(theta)[3] + mat_data(adaptive_theta_hat_dot)[3] + mat_data(ICL_theta_hat_dot)[3];
+	mat_data(theta)[4] = mat_data(theta)[4] + mat_data(adaptive_theta_hat_dot)[4] + mat_data(ICL_theta_hat_dot)[4];
+	mat_data(theta)[5] = mat_data(theta)[5] + mat_data(adaptive_theta_hat_dot)[5] + mat_data(ICL_theta_hat_dot)[5];
+	mat_data(theta)[6] = mat_data(theta)[6] + mat_data(adaptive_theta_hat_dot)[6] + mat_data(ICL_theta_hat_dot)[6];
+	mat_data(theta)[7] = mat_data(theta)[7] + mat_data(adaptive_theta_hat_dot)[7] + mat_data(ICL_theta_hat_dot)[7];
+
+	//Y_theta
+	MAT_MULT(&Y, &theta, &Ytheta);
+	
+	/* control input M1, M2, M3 */
+	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] +mat_data(Ytheta)[0]; 
+	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] +mat_data(Ytheta)[1];
+	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] +mat_data(Ytheta)[2];
+	
+	mat_data(W_last5)[0] = mat_data(W_last4)[0];
+	mat_data(W_last5)[1] = mat_data(W_last4)[1];
+	mat_data(W_last5)[2] = mat_data(W_last4)[2];
+	mat_data(W_last4)[0] = mat_data(W_last3)[0];
+	mat_data(W_last4)[1] = mat_data(W_last3)[1];
+	mat_data(W_last4)[2] = mat_data(W_last3)[2];
+	mat_data(W_last3)[0] = mat_data(W_last2)[0];
+	mat_data(W_last3)[1] = mat_data(W_last2)[1];
+	mat_data(W_last3)[2] = mat_data(W_last2)[2];
+	mat_data(W_last2)[0] = mat_data(W_last)[0];
+	mat_data(W_last2)[1] = mat_data(W_last)[1];
+	mat_data(W_last2)[2] = mat_data(W_last)[2];
+	mat_data(W_last)[0] = mat_data(W)[0];
+	mat_data(W_last)[1] = mat_data(W)[1];
+	mat_data(W_last)[2] = mat_data(W)[2];
+	mat_data(M_last5)[0] = mat_data(M_last4)[0];
+	mat_data(M_last5)[1] = mat_data(M_last4)[1];
+	mat_data(M_last5)[2] = mat_data(M_last4)[2];
+	mat_data(M_last4)[0] = mat_data(M_last3)[0];
+	mat_data(M_last4)[1] = mat_data(M_last3)[1];
+	mat_data(M_last4)[2] = mat_data(M_last3)[2];
+	mat_data(M_last3)[0] = mat_data(M_last2)[0];
+	mat_data(M_last3)[1] = mat_data(M_last2)[1];
+	mat_data(M_last3)[2] = mat_data(M_last2)[2];
+	mat_data(M_last2)[0] = mat_data(M_last)[0];
+	mat_data(M_last2)[1] = mat_data(M_last)[1];
+	mat_data(M_last2)[2] = mat_data(M_last)[2];
+	mat_data(M_last)[0] = output_moments[0];
+	mat_data(M_last)[1] = output_moments[1];
+	mat_data(M_last)[2] = output_moments[2];
+	output_force_last5 = output_force_last4;
+	output_force_last4 = output_force_last3;
+	output_force_last3 = output_force_last2;
+	output_force_last2 = output_force_last;
+	output_force_last = *output_force;
+	
 #endif
 
 }
@@ -870,26 +1159,41 @@ void send_geometry_moment_ctrl_debug(debug_msg_t *payload)
 
 void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 {
+	//y_cl_theta
+	MAT_ALLOC(y_cltheta_test,3,1);
+	MAT_INIT(y_cltheta_test,3,1);
+	MAT_MULT(&sigma_array[ICL_sigma_index].y_cl, &theta, &y_cltheta_test);
+	//Mb - y_cl_theta
+	MAT_ALLOC(Mb_y_cltheta_test,3,1);
+	MAT_INIT(Mb_y_cltheta_test,3,1);
+	MAT_SUB(&sigma_array[ICL_sigma_index].Mb, &y_cltheta_test, &Mb_y_cltheta_test);
+	//y_cl.T*(Mb - y_cl_theta)	
 	float roll_error = rad_to_deg(mat_data(eR)[0]);
 	float pitch_error = rad_to_deg(mat_data(eR)[1]);
 	float yaw_error = rad_to_deg(mat_data(eR)[2]);
-
-	float wx_error = rad_to_deg(mat_data(eW)[0]);
-	float wy_error = rad_to_deg(mat_data(eW)[1]);
-	float wz_error = rad_to_deg(mat_data(eW)[2]);
 	
-	float theta_x = mat_data(theta)[0];
-	float theta_y = mat_data(theta)[1];
-
+	float theta0 = mat_data(theta)[0];
+	float theta1 = mat_data(theta)[1];
+	float theta2 = mat_data(theta)[2];
+	float theta3 = mat_data(theta)[3];
+	float theta4 = mat_data(theta)[4];
+	float theta5 = mat_data(theta)[5];
+	float theta6 = mat_data(theta)[6];
+	float theta7 = mat_data(theta)[7];
+	
 	pack_debug_debug_message_header(payload, MESSAGE_ID_ADAPTIVE_THETA);
 	pack_debug_debug_message_float(&roll_error, payload);
 	pack_debug_debug_message_float(&pitch_error, payload);
 	pack_debug_debug_message_float(&yaw_error, payload);
-	pack_debug_debug_message_float(&wx_error, payload);
-	pack_debug_debug_message_float(&wy_error, payload);
-	pack_debug_debug_message_float(&wz_error, payload);
-	pack_debug_debug_message_float(&theta_x, payload);
-	pack_debug_debug_message_float(&theta_y, payload);
+	
+	pack_debug_debug_message_float(&theta0, payload);
+	pack_debug_debug_message_float(&theta1, payload);
+	pack_debug_debug_message_float(&theta2, payload);
+	pack_debug_debug_message_float(&theta3, payload);
+	pack_debug_debug_message_float(&theta4, payload);
+	pack_debug_debug_message_float(&theta5, payload);
+	pack_debug_debug_message_float(&theta6, payload);
+	pack_debug_debug_message_float(&theta7, payload);
 }
 void send_geometry_tracking_ctrl_debug(debug_msg_t *payload)
 {

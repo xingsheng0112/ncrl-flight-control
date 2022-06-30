@@ -6,20 +6,11 @@
 #include "debug_link.h"
 #include "matrix.h"
 
-#define ICL_N 20
-#define ICL_INTEGRAL_TIMES 20
+#define ICL_N 25
 
 typedef struct {
-	float y;
-	MAT_ALLOC(M,3,1);	
-	MAT_ALLOC(y_omega_J,3,1);	
-	MAT_ALLOC(W,3,1);	
-} ICL_integral;
-
-typedef struct {
-	float y;
-	MAT_ALLOC(y_omega,3,1);	
-	MAT_ALLOC(M_hat,3,1);	
+	MAT_ALLOC(y_cl,3,8);	
+	MAT_ALLOC(Mb,3,1);	//M_bar
 } ICL_sigma;
 
 void geometry_ctrl_init(void);
