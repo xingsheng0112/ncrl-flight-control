@@ -32,7 +32,7 @@
 #define dt 0.0025 //[s]
 #define MOTOR_TO_CG_LENGTH 16.25f //[cm]
 #define MOTOR_TO_CG_LENGTH_M (MOTOR_TO_CG_LENGTH * 0.01) //[m]
-#define COEFFICIENT_YAW 1.0f
+#define COEFFICIENT_YAW 0.117f
 
 MAT_ALLOC(J, 3, 3);
 MAT_ALLOC(R, 3, 3);
