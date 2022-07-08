@@ -101,7 +101,7 @@ MAT_ALLOC(Yt, 8, 3);
 MAT_ALLOC(eW_c2eR, 3, 1);
 MAT_ALLOC(Yt_eW_c2eR,8,1);
 MAT_ALLOC(Ytheta,3,1);
-float adaptive_gamma[8] = {0.000005,0.000005,0.000028,0.000028,0.000005,0.0000028,0.00000028,0.00000028};
+float adaptive_gamma[8] = {0.000005,0.000005,0.000028,0.000028,0.000005,0.0000028,0.0000028,0.0000028};
 
 float c2 = 10;
 
@@ -137,7 +137,7 @@ float output_force_last2 = 0;
 float output_force_last3 = 0;
 float output_force_last4 = 0;
 float output_force_last5 = 0;
-float k_icl[8] = {0.1,0.1,1200,1200,2200, 6000, 1000, 1000};
+float k_icl[8] = {0.1,0.1,1200,1200,2200, 4000, 4000, 4000};
 float adaptive_gamma_k_icl[8];
 
 
@@ -190,16 +190,6 @@ void geometry_ctrl_init(void)
 //adaptive & ICL parameters
 //adaptive
 	MAT_INIT(theta, 8, 1);
-	/*
-	mat_data(theta)[0] = 0.04f;
-	mat_data(theta)[1] = 0.04f;
-	mat_data(theta)[2] = 0.02f;
-	mat_data(theta)[3] = 0.02f;
-	mat_data(theta)[4] = 0.1f;
-	mat_data(theta)[5] = 0.002f;
-	mat_data(theta)[6] = 0.002f;
-	mat_data(theta)[7] = 0.002f;
-	*/
 	mat_data(theta)[0] = 0.0f;
 	mat_data(theta)[1] = 0.0f;
 	mat_data(theta)[2] = 0.0f;
