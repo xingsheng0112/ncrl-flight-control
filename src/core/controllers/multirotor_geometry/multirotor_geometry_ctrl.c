@@ -604,11 +604,58 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mat_data(inertia_effect)[1] = mat_data(WJW)[1];
 	mat_data(inertia_effect)[2] = mat_data(WJW)[2];
 
-#if (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_NONE)
+#if (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_ORIGIN)
+#pragma "ORIGIN"
 	/* control input M1, M2, M3 */
 	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0];
 	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1];
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
+#elif (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_NONE)
+	
+#pragma "NONE"
+	/*adaptive*/	
+	//Y1 of Y
+	// [0	-f	]
+	// [f	0	]
+	// [0	0	]
+	mat_data(Y)[0*8 + 0] = 0; 
+	mat_data(Y)[1*8 + 0] = *output_force; 
+	mat_data(Y)[2*8 + 0] = 0;
+	mat_data(Y)[0*8 + 1] = -*output_force; 
+	mat_data(Y)[1*8 + 1] = 0; 
+	mat_data(Y)[2*8 + 1] = 0;
+	//Y2 of Y
+	//wb: omega_bar
+	//w: angular velocity
+	//[-wb1		,-w1*w2	,w1*w2	,-wb1-w0*w2	,-wb2+w0*w1	,-w2^2+w1^2	]
+	//[w0*w2	,-wb1	,-w0*w2	,-wb0+w1*w2	,-w0^2+w2^2	,-wb2-w0*w1	]
+	//[-w0*w1	,w0*w1	,--wb2	,-w1^2+w0^2	,-wb0-w1*w2	,-wb1+w0*w2	]
+	mat_data(Y)[0*8 + 2] = 0; 
+	mat_data(Y)[1*8 + 2] = mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 2] = -mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[0*8 + 3] = -mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[1*8 + 3] = 0;
+	mat_data(Y)[2*8 + 3] = mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[0*8 + 4] = mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[1*8 + 4] = -mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 4] = 0;
+	mat_data(Y)[0*8 + 5] = -mat_data(W)[0]*mat_data(W)[2];
+	mat_data(Y)[1*8 + 5] = mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 5] = -mat_data(W)[1]*mat_data(W)[1] +mat_data(W)[0]*mat_data(W)[0];
+	mat_data(Y)[0*8 + 6] = mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[1*8 + 6] = -mat_data(W)[0]*mat_data(W)[0] +mat_data(W)[2]*mat_data(W)[2];
+	mat_data(Y)[2*8 + 6] = -mat_data(W)[1]*mat_data(W)[2];
+	mat_data(Y)[0*8 + 7] = -mat_data(W)[2]*mat_data(W)[2] +mat_data(W)[1]*mat_data(W)[1];
+	mat_data(Y)[1*8 + 7] = -mat_data(W)[0]*mat_data(W)[1];
+	mat_data(Y)[2*8 + 7] = mat_data(W)[0]*mat_data(W)[2];
+
+	//Y_theta
+	MAT_MULT(&Y, &theta, &Ytheta);
+	
+	/* control input M1, M2, M3 */
+	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] +mat_data(Ytheta)[0]; 
+	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] +mat_data(Ytheta)[1];
+	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] +mat_data(Ytheta)[2];
 #elif (SELECT_CONTROLLER_ESTIMATOR == CONTROLLER_ESTIMATION_USE_ADAPTIVE)
 	
 	/*adaptive*/	
