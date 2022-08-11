@@ -101,7 +101,8 @@ MAT_ALLOC(Yt, 8, 3);
 MAT_ALLOC(eW_c2eR, 3, 1);
 MAT_ALLOC(Yt_eW_c2eR,8,1);
 MAT_ALLOC(Ytheta,3,1);
-float adaptive_gamma[8] = {0.000005,0.000005,0.000028,0.000028,0.000005,0.0000028,0.0000028,0.0000028};
+//float adaptive_gamma[8] = {0.000005,0.000005,0.000028,0.000028,0.000005,0.0000028,0.0000028,0.0000028};
+float adaptive_gamma[8] = {0.000002,0.000002,0.000002,0.000002,0.000002,0.000002,0.000002,0.000002};
 
 float c2 = 10;
 
@@ -137,7 +138,8 @@ float output_force_last2 = 0;
 float output_force_last3 = 0;
 float output_force_last4 = 0;
 float output_force_last5 = 0;
-float k_icl[8] = {0.1,0.1,1200,1200,2200, 4000, 4000, 4000};
+//float k_icl[8] = {0.1,0.1,1200,1200,2200, 4000, 4000, 4000};
+float k_icl[8] = {20000,20000,20000,20000,20000, 20000,20000,20000};
 float adaptive_gamma_k_icl[8];
 
 
@@ -192,9 +194,9 @@ void geometry_ctrl_init(void)
 	MAT_INIT(theta, 8, 1);
 	mat_data(theta)[0] = 0.0f;
 	mat_data(theta)[1] = 0.0f;
-	mat_data(theta)[2] = 0.0f;
-	mat_data(theta)[3] = 0.0f;
-	mat_data(theta)[4] = 0.0f;
+	mat_data(theta)[2] = 0.006f;
+	mat_data(theta)[3] = 0.006f;
+	mat_data(theta)[4] = 0.011f;
 	mat_data(theta)[5] = 0.0f;
 	mat_data(theta)[6] = 0.0f;
 	mat_data(theta)[7] = 0.0f;
@@ -831,7 +833,88 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mat_data(Y1_Y_W)[0*8 + 7] = -mat_data(W)[2]*mat_data(W)[2] +mat_data(W)[1]*mat_data(W)[1];
 	mat_data(Y1_Y_W)[1*8 + 7] = -mat_data(W)[0]*mat_data(W)[1];
 	mat_data(Y1_Y_W)[2*8 + 7] = mat_data(W)[0]*mat_data(W)[2];
-	
+
+
+#if 1
+	/* generate Inertia filter*/
+	MAT_ALLOC(J_gt, 3, 3);
+	MAT_INIT(J_gt, 3, 3);
+	MAT_ALLOC(J_gt_inv, 3, 3);
+	MAT_INIT(J_gt_inv, 3, 3);
+	MAT_ALLOC(f_cog, 3, 1);
+	MAT_INIT(f_cog, 3, 1);
+	/* define J_gt */
+	mat_data(J_gt)[0*3 + 0] = 0.0133; 
+	mat_data(J_gt)[1*3 + 0] = 0.0021; 
+	mat_data(J_gt)[2*3 + 0] = 0;
+	mat_data(J_gt)[0*3 + 1] = 0.0021; 
+	mat_data(J_gt)[1*3 + 1] = 0.0134; 
+	mat_data(J_gt)[2*3 + 1] = 0;
+	mat_data(J_gt)[0*3 + 2] = 0; 
+	mat_data(J_gt)[1*3 + 2] = 0; 
+	mat_data(J_gt)[2*3 + 2] = 0.0228;
+	/*define J_gt_inv */
+	mat_data(J_gt_inv)[0*3 + 0] = 76.8859; 
+	mat_data(J_gt_inv)[1*3 + 0] = -12.2901; 
+	mat_data(J_gt_inv)[2*3 + 0] = 0;
+	mat_data(J_gt_inv)[0*3 + 1] = -12.2901; 
+	mat_data(J_gt_inv)[1*3 + 1] = 76.3142; 
+	mat_data(J_gt_inv)[2*3 + 1] = 0;
+	mat_data(J_gt_inv)[0*3 + 2] = 0; 
+	mat_data(J_gt_inv)[1*3 + 2] = 0; 
+	mat_data(J_gt_inv)[2*3 + 2] = 43.7638;
+	/*define r_cog */
+	mat_data(f_cog)[0] = -mat_data(theta)[1]*output_force_last5; 
+	mat_data(f_cog)[1] = mat_data(theta)[0]*output_force_last5; 
+	mat_data(f_cog)[2] = 0;
+	/*genetate WJW */	
+	MAT_MULT(&J_gt, &W, &JW);
+	cross_product_3x1(mat_data(W), mat_data(JW), mat_data(WJW));
+	/* generate W_dot_hat */
+	MAT_ALLOC(W_dot_hat, 3, 1);
+	MAT_INIT(W_dot_hat, 3, 1);
+	MAT_ALLOC(m_f_cog, 3, 1);
+	MAT_INIT(m_f_cog, 3, 1);
+	MAT_ALLOC(m_f_cog_WJW, 3, 1);
+	MAT_INIT(m_f_cog_WJW, 3, 1);
+
+	MAT_SUB(&M_last5, &f_cog, &m_f_cog);
+	MAT_SUB(&m_f_cog, &WJW, &m_f_cog_WJW);
+	MAT_MULT(&J_gt_inv, &m_f_cog_WJW, &W_dot_hat);
+	/* generate W_filt */
+	MAT_ALLOC(W_filt, 3, 1);
+	MAT_INIT(W_filt, 3, 1);
+	float k_omega = 0.8;
+	mat_data(W_filt)[0] = (1.0f - k_omega)*mat_data(W)[0] + k_omega*(mat_data(W_last5)[0] + mat_data(W_dot_hat)[0]*5*dt);
+	mat_data(W_filt)[1] = (1.0f - k_omega)*mat_data(W)[1] + k_omega*(mat_data(W_last5)[1] + mat_data(W_dot_hat)[1]*5*dt);
+	mat_data(W_filt)[2] = (1.0f - k_omega)*mat_data(W)[2] + k_omega*(mat_data(W_last5)[2] + mat_data(W_dot_hat)[2]*5*dt);
+	/*common ICL regression*/
+	MAT_SUB(&W_filt, &W_last5, &W_dot);
+	mat_data(W_dot_Matrix)[0*8 + 0] = 0; 
+	mat_data(W_dot_Matrix)[1*8 + 0] = 0;
+	mat_data(W_dot_Matrix)[2*8 + 0] = 0;
+	mat_data(W_dot_Matrix)[0*8 + 1] = 0; 
+	mat_data(W_dot_Matrix)[1*8 + 1] = 0;
+	mat_data(W_dot_Matrix)[2*8 + 1] = 0;
+	mat_data(W_dot_Matrix)[0*8 + 2] = mat_data(W_dot)[0]; 
+	mat_data(W_dot_Matrix)[1*8 + 2] = 0;
+	mat_data(W_dot_Matrix)[2*8 + 2] = 0;
+	mat_data(W_dot_Matrix)[0*8 + 3] = 0;
+	mat_data(W_dot_Matrix)[1*8 + 3] = mat_data(W_dot)[1];
+	mat_data(W_dot_Matrix)[2*8 + 3] = 0;
+	mat_data(W_dot_Matrix)[0*8 + 4] = 0;
+	mat_data(W_dot_Matrix)[1*8 + 4] = 0;
+	mat_data(W_dot_Matrix)[2*8 + 4] = mat_data(W_dot)[2];
+	mat_data(W_dot_Matrix)[0*8 + 5] = mat_data(W_dot)[1];
+	mat_data(W_dot_Matrix)[1*8 + 5] = mat_data(W_dot)[0];
+	mat_data(W_dot_Matrix)[2*8 + 5] = 0;
+	mat_data(W_dot_Matrix)[0*8 + 6] = mat_data(W_dot)[2];
+	mat_data(W_dot_Matrix)[1*8 + 6] = 0;
+	mat_data(W_dot_Matrix)[2*8 + 6] = mat_data(W_dot)[0];
+	mat_data(W_dot_Matrix)[0*8 + 7] = 0;
+	mat_data(W_dot_Matrix)[1*8 + 7] = mat_data(W_dot)[2];
+	mat_data(W_dot_Matrix)[2*8 + 7] = mat_data(W_dot)[1];
+#else
 	MAT_SUB(&W, &W_last5, &W_dot);
 	mat_data(W_dot_Matrix)[0*8 + 0] = 0; 
 	mat_data(W_dot_Matrix)[1*8 + 0] = 0;
@@ -857,7 +940,7 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mat_data(W_dot_Matrix)[0*8 + 7] = 0;
 	mat_data(W_dot_Matrix)[1*8 + 7] = mat_data(W_dot)[2];
 	mat_data(W_dot_Matrix)[2*8 + 7] = mat_data(W_dot)[1];
-	
+#endif
 	//Y1_Y_Wdt = Y1_Y
 	MAT_SCALE(&Y1_Y_W, dt*5, &Y1_Y_Wdt);
 	
