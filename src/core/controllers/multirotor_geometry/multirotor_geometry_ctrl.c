@@ -844,6 +844,17 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	MAT_ALLOC(f_cog, 3, 1);
 	MAT_INIT(f_cog, 3, 1);
 	/* define J_gt */
+#if 1
+	mat_data(J_gt)[0*3 + 0] = mat_data(theta)[2]; 
+	mat_data(J_gt)[1*3 + 0] = mat_data(theta)[5]; 
+	mat_data(J_gt)[2*3 + 0] = mat_data(theta)[6];
+	mat_data(J_gt)[0*3 + 1] = mat_data(theta)[5]; 
+	mat_data(J_gt)[1*3 + 1] = mat_data(theta)[3]; 
+	mat_data(J_gt)[2*3 + 1] = mat_data(theta)[7];
+	mat_data(J_gt)[0*3 + 2] = mat_data(theta)[6]; 
+	mat_data(J_gt)[1*3 + 2] = mat_data(theta)[7]; 
+	mat_data(J_gt)[2*3 + 2] = mat_data(theta)[4];
+#else
 	mat_data(J_gt)[0*3 + 0] = 0.0133; 
 	mat_data(J_gt)[1*3 + 0] = 0.0021; 
 	mat_data(J_gt)[2*3 + 0] = 0;
@@ -853,16 +864,9 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mat_data(J_gt)[0*3 + 2] = 0; 
 	mat_data(J_gt)[1*3 + 2] = 0; 
 	mat_data(J_gt)[2*3 + 2] = 0.0228;
+#endif
 	/*define J_gt_inv */
-	mat_data(J_gt_inv)[0*3 + 0] = 76.8859; 
-	mat_data(J_gt_inv)[1*3 + 0] = -12.2901; 
-	mat_data(J_gt_inv)[2*3 + 0] = 0;
-	mat_data(J_gt_inv)[0*3 + 1] = -12.2901; 
-	mat_data(J_gt_inv)[1*3 + 1] = 76.3142; 
-	mat_data(J_gt_inv)[2*3 + 1] = 0;
-	mat_data(J_gt_inv)[0*3 + 2] = 0; 
-	mat_data(J_gt_inv)[1*3 + 2] = 0; 
-	mat_data(J_gt_inv)[2*3 + 2] = 43.7638;
+	MAT_INV(&J_gt, &J_gt_inv);
 	/*define r_cog */
 	mat_data(f_cog)[0] = -mat_data(theta)[1]*output_force_last5; 
 	mat_data(f_cog)[1] = mat_data(theta)[0]*output_force_last5; 
