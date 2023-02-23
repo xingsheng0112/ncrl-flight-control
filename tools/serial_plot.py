@@ -10,7 +10,7 @@ from collections import deque
 from datetime import datetime
 
 ser = serial.Serial(
-    port='/dev/ttyUSB2',
+    port='/dev/ttyUSB0',
     baudrate=115200,
     parity=serial.PARITY_NONE,
     stopbits=serial.STOPBITS_ONE,
