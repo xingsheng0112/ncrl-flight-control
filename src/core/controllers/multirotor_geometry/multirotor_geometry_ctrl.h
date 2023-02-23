@@ -6,11 +6,11 @@
 #include "debug_link.h"
 #include "matrix.h"
 
-#define ICL_N 25
+#define ICL_N 10
 
 typedef struct {
 	MAT_ALLOC(y_cl,3,8);	
-	MAT_ALLOC(Mb,3,1);	//M_bar
+	MAT_ALLOC(F,4,1);	//F_bar
 } ICL_sigma;
 
 void geometry_ctrl_init(void);
