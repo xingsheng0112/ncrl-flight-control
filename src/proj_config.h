@@ -19,7 +19,7 @@
 /* telemetry debug channel protocols */
 #define TELEM_SHELL      0
 #define TELEM_DEBUG_LINK 1
-#define SELECT_DEBUG_TELEM TELEM_SHELL
+#define SELECT_DEBUG_TELEM TELEM_DEBUG_LINK
 
 /* debug link message publish rate */
 #define DEBUG_LINK_PUBLISH_20Hz  0 //recommanded for wireless communication

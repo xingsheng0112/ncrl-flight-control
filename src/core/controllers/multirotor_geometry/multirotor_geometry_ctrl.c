@@ -64,6 +64,7 @@ MAT_ALLOC(b1d, 3, 1);
 MAT_ALLOC(b2d, 3, 1);
 MAT_ALLOC(b3d, 3, 1);
 
+MAT_ALLOC(thrust, 4, 1);
 float pos_error[3];
 float vel_error[3];
 float tracking_error_integral[3];
@@ -129,6 +130,9 @@ void geometry_ctrl_init(void)
 	MAT_INIT(b1d, 3, 1);
 	MAT_INIT(b2d, 3, 1);
 	MAT_INIT(b3d, 3, 1);
+
+	MAT_INIT(thrust, 4, 1);
+
 
 	/* modify local variables when user change them via ground station */
 	set_sys_param_update_var_addr(MR_GEO_GAIN_ROLL_P, &krx);
@@ -483,6 +487,10 @@ void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 	motor_force[3] = -l_div_4 * moment[0] - l_div_4 * moment[1] +
 	                 +b_div_4 * moment[2] + distributed_force;
 
+	mat_data(thrust)[0] = motor_force[0];
+	mat_data(thrust)[1] = motor_force[1];
+	mat_data(thrust)[2] = motor_force[2];
+	mat_data(thrust)[3] = motor_force[3];
 	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(motor_force[0]));
 	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(motor_force[1]));
 	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(motor_force[2]));
@@ -685,7 +693,16 @@ void send_geometry_moment_ctrl_debug(debug_msg_t *payload)
 
 void send_geometry_tracking_ctrl_debug(debug_msg_t *payload)
 {
+	float T1 = mat_data(thrust)[0];
+	float T2 = mat_data(thrust)[1];
+	float T3 = mat_data(thrust)[2];
+	float T4 = mat_data(thrust)[3];
+
 	pack_debug_debug_message_header(payload, MESSAGE_ID_GEOMETRY_TRACKING_CTRL);
+	pack_debug_debug_message_float(&T1, payload);
+	pack_debug_debug_message_float(&T2, payload);
+	pack_debug_debug_message_float(&T3, payload);
+	pack_debug_debug_message_float(&T4, payload);	
 	pack_debug_debug_message_float(&pos_error[0], payload);
 	pack_debug_debug_message_float(&pos_error[1], payload);
 	pack_debug_debug_message_float(&pos_error[2], payload);
