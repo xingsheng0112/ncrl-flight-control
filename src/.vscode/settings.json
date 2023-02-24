@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "cstddef": "c",
+        "string": "c",
+        "optional": "c",
+        "limits": "c",
+        "memory": "c",
+        "new": "c",
+        "functional": "c"
+    }
+}

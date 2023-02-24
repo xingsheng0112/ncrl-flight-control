@@ -74,6 +74,7 @@ float motor_thrust_amplified[4] = {0.0f};
 // ICL
 MAT_ALLOC(S, 4, 1);
 MAT_ALLOC(Y, 4, 4);
+MAT_ALLOC(F, 4, 1);
 MAT_ALLOC(Y_dt, 4, 4);
 MAT_ALLOC(ICL_control_term, 4, 1);
 MAT_ALLOC(theta_hat_dot, 4, 1);
@@ -537,7 +538,11 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mge3_mvdot_dt[0] =  0 - uav_mass*curr_vel_ned[0];
 	mge3_mvdot_dt[1] =  0 - uav_mass*curr_vel_ned[1];
 	mge3_mvdot_dt[2] =  uav_mass*9.81*dt - uav_mass*curr_vel_ned[2];
-	arm_dot_prod_f32(mge3_mvdot_dt, mat_data(Re3), 3, Y_F);
+
+
+	Y_F = 	mge3_mvdot_dt[0]*mat_data(Re3)[0]+
+			mge3_mvdot_dt[1]*mat_data(Re3)[1]+
+			mge3_mvdot_dt[2]*mat_data(Re3)[2];	
 	float Y_M[3] = {0.0f};
 	Y_M[0] = mat_data(J)[0]*mat_data(W)[0] + mat_data(W)[1]*mat_data(W)[2]*(mat_data(J)[8] - mat_data(J)[4])*dt;
 	Y_M[1] = mat_data(J)[4]*mat_data(W)[1] + mat_data(W)[0]*mat_data(W)[2]*(mat_data(J)[0] - mat_data(J)[8])*dt;
@@ -565,8 +570,8 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mat_data(Y)[3*4 + 3] =  COEFFICIENT_YAW * mat_data(motor_thrust)[3];
 	MAT_SCALE(&Y, dt, &Y_dt);
 
-	sigma_array[ICL_sigma_index].y_cl = mat_data(Y_dt);
-	sigma_array[ICL_sigma_index].F = mat_data(S);
+	sigma_array[ICL_sigma_index].y_cl = Y_dt;
+	sigma_array[ICL_sigma_index].F = S;
 	ICL_sigma_index ++;
 	ICL_sigma_index %= ICL_N;
 
