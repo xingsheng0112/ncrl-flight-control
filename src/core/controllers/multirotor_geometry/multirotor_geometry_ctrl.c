@@ -33,7 +33,7 @@
 #define dt 0.0025 //[s]
 #define MOTOR_TO_CG_LENGTH 16.25f //[cm]
 #define MOTOR_TO_CG_LENGTH_M (MOTOR_TO_CG_LENGTH * 0.01) //[m]
-#define COEFFICIENT_YAW 0.117f
+#define COEFFICIENT_YAW 1.0f
 
 MAT_ALLOC(J, 3, 3);
 MAT_ALLOC(R, 3, 3);
@@ -85,7 +85,7 @@ MAT_ALLOC(y_clT, 4, 4);
 MAT_ALLOC(y_clT_F_y_cltheta, 4, 1);
 MAT_ALLOC(ICL_theta_hat_dot, 4, 1);
 // ICL gain
-float Gamma_gain[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+float Gamma_gain[4] = {4.0f, 4.0f, 4.0f, 4.0f};
 float k_icl_gain = 1;
 float gamma_k_icl[4] = {0.0f};
 int ICL_sigma_index = 0;
@@ -674,14 +674,14 @@ void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 	#endif
 
 	// real efficiency 
-	float e1 = 1.0;//0.7;
-	float e2 = 1.0;//0.8;
-	float e3 = 1.0;//0.6;
-	float e4 = 1.0;//0.9;
-	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(motor_force[0]));
-	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(motor_force[1]));
-	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(motor_force[2]));
-	set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(motor_force[3]));
+	float e1 = 0.8;//0.7;
+	float e2 = 0.8;//0.8;
+	float e3 = 0.8;//0.6;
+	float e4 = 0.8;//0.9;
+	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(feedback_motor_force[0])*e1);
+	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(feedback_motor_force[1])*e2);
+	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(feedback_motor_force[2])*e3);
+	set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(feedback_motor_force[3])*e4);
 
 	mat_data(motor_thrust)[0] = feedback_motor_force[0]*e1;
 	mat_data(motor_thrust)[1] = feedback_motor_force[1]*e2;
@@ -926,6 +926,10 @@ void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 	pack_debug_debug_message_float(&icl_term2, payload);
 	pack_debug_debug_message_float(&icl_term3, payload);
 	pack_debug_debug_message_float(&icl_term4, payload);	
+	//ex
+	pack_debug_debug_message_float(&pos_error[0], payload);
+	pack_debug_debug_message_float(&pos_error[1], payload);
+	pack_debug_debug_message_float(&pos_error[2], payload);	
 	
 	/*
 	//motor thrust amplified
@@ -934,10 +938,7 @@ void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 	pack_debug_debug_message_float(&motor_thrust_amplified[2], payload);
 	pack_debug_debug_message_float(&motor_thrust_amplified[3], payload);	
 	
-	//ex
-	pack_debug_debug_message_float(&pos_error[0], payload);
-	pack_debug_debug_message_float(&pos_error[1], payload);
-	pack_debug_debug_message_float(&pos_error[2], payload);	
+
 	//ev
 	pack_debug_debug_message_float(&vel_error[0], payload);
 	pack_debug_debug_message_float(&vel_error[1], payload);
