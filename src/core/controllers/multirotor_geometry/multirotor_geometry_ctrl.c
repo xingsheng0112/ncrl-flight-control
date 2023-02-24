@@ -528,6 +528,9 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1];
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
 
+	#if (SELECT_ESTIMATOR == WITHOUT_ESTIMATOR)
+	
+	#elif (SELECT_ESTIMATOR == WITH_ESTIMATOR)
 	/* Do icl here, don't need to modify the controller above */
 	float mge3_mvdot_dt[3] = {0.0f};
 	float Y_F = 0.0f;
@@ -591,6 +594,7 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mat_data(theta)[1] = mat_data(theta)[1] + mat_data(ICL_theta_hat_dot)[1] * dt;
 	mat_data(theta)[2] = mat_data(theta)[2] + mat_data(ICL_theta_hat_dot)[2] * dt;
 	mat_data(theta)[3] = mat_data(theta)[3] + mat_data(ICL_theta_hat_dot)[3] * dt;
+	#endif
 }
 
 #define l_div_4 (0.25f * (1.0f / MOTOR_TO_CG_LENGTH_M))
@@ -609,6 +613,8 @@ void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 	motor_force[3] = -l_div_4 * moment[0] - l_div_4 * moment[1] +
 	                 +b_div_4 * moment[2] + distributed_force;
 
+	#if (SELECT_ESTIMATOR == WITH_ESTIMATOR)
+
 	for(int i=0; i<4; i++){
 		if(mat_data(theta)[i] > 1){
 			mat_data(theta)[i] = 1;
@@ -617,7 +623,6 @@ void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 			mat_data(theta)[i] = 0.6;
 		}
 	}
-
 	// feedback efficiency from the estimator 
 	float feedback_motor_force[4] = {0.0f};
 	feedback_motor_force[0] = motor_force[0] / mat_data(theta)[0];
@@ -630,15 +635,18 @@ void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 	motor_thrust_amplified[1] = feedback_motor_force[1];
 	motor_thrust_amplified[2] = feedback_motor_force[2];
 	motor_thrust_amplified[3] = feedback_motor_force[3];
+
+	#endif
+
 	// real efficiency 
 	float e1 = 1.0;//0.7;
-	float e2 = 0.7;//0.8;
-	float e3 = 0.7;//0.6;
+	float e2 = 1.0;//0.8;
+	float e3 = 1.0;//0.6;
 	float e4 = 1.0;//0.9;
-	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(motor_force[0]));
-	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(motor_force[1]));
-	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(motor_force[2]));
-	set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(motor_force[3]));
+	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(motor_force[0]*e1));
+	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(motor_force[1]*e2));
+	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(motor_force[2]*e3));
+	set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(motor_force[3]*e4));
 
 	mat_data(motor_thrust)[0] = feedback_motor_force[0]*e1;
 	mat_data(motor_thrust)[1] = feedback_motor_force[1]*e2;
