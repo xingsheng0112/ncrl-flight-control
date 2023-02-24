@@ -873,6 +873,10 @@ void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 	float T3 = mat_data(motor_thrust)[2];
 	float T4 = mat_data(motor_thrust)[3];
 
+	float icl_term1 = mat_data(ICL_theta_hat_dot)[0];
+	float icl_term2 = mat_data(ICL_theta_hat_dot)[1];
+	float icl_term3 = mat_data(ICL_theta_hat_dot)[2];
+	float icl_term4 = mat_data(ICL_theta_hat_dot)[3];
 	float time_now = get_sys_time_s();
 	
 	pack_debug_debug_message_header(payload, MESSAGE_ID_ICL_ESTIMATION);
@@ -887,12 +891,20 @@ void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 	pack_debug_debug_message_float(&T2, payload);
 	pack_debug_debug_message_float(&T3, payload);
 	pack_debug_debug_message_float(&T4, payload);	
+	//icl term
+	pack_debug_debug_message_float(&icl_term1, payload);
+	pack_debug_debug_message_float(&icl_term2, payload);
+	pack_debug_debug_message_float(&icl_term3, payload);
+	pack_debug_debug_message_float(&icl_term4, payload);	
+	
+	mat_data(ICL_theta_hat_dot)[0]
+	/*
 	//motor thrust amplified
 	pack_debug_debug_message_float(&motor_thrust_amplified[0], payload);
 	pack_debug_debug_message_float(&motor_thrust_amplified[1], payload);
 	pack_debug_debug_message_float(&motor_thrust_amplified[2], payload);
 	pack_debug_debug_message_float(&motor_thrust_amplified[3], payload);	
-	/*
+	
 	//ex
 	pack_debug_debug_message_float(&pos_error[0], payload);
 	pack_debug_debug_message_float(&pos_error[1], payload);
