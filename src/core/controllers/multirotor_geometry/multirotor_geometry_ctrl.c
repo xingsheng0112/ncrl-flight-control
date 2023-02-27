@@ -33,7 +33,7 @@
 #define dt 0.0025 //[s]
 #define MOTOR_TO_CG_LENGTH 16.25f //[cm]
 #define MOTOR_TO_CG_LENGTH_M (MOTOR_TO_CG_LENGTH * 0.01) //[m]
-#define COEFFICIENT_YAW 1.0f
+#define COEFFICIENT_YAW 0.25f
 
 MAT_ALLOC(J, 3, 3);
 MAT_ALLOC(R, 3, 3);
@@ -70,7 +70,7 @@ MAT_ALLOC(b3d, 3, 1);
 
 // Motor thrust
 MAT_ALLOC(motor_thrust, 4, 1);
-float motor_thrust_amplified[4] = {0.0f};
+float motor_thrust_normal[4] = {0.0f};
 // ICL
 MAT_ALLOC(S, 4, 1);
 MAT_ALLOC(Y, 4, 4);
@@ -85,7 +85,7 @@ MAT_ALLOC(y_clT, 4, 4);
 MAT_ALLOC(y_clT_F_y_cltheta, 4, 1);
 MAT_ALLOC(ICL_theta_hat_dot, 4, 1);
 // ICL gain
-float Gamma_gain[4] = {4.0f, 4.0f, 4.0f, 4.0f};
+float Gamma_gain[4] = {3.0f, 3.0f, 3.0f, 3.0f};
 float k_icl_gain = 1;
 float gamma_k_icl[4] = {0.0f};
 int ICL_sigma_index = 0;
@@ -633,8 +633,26 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 
 #define l_div_4 (0.25f * (1.0f / MOTOR_TO_CG_LENGTH_M))
 #define b_div_4 (+0.25f * (1.0f / COEFFICIENT_YAW))
-
 void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
+{
+	/* quadrotor thrust allocation */
+	float distributed_force = total_force *= 0.25; //split force to 4 motors
+	float motor_force[4];
+	motor_force[0] = -l_div_4 * moment[0] + l_div_4 * moment[1] +
+	                 -b_div_4 * moment[2] + distributed_force;
+	motor_force[1] = +l_div_4 * moment[0] + l_div_4 * moment[1] +
+	                 +b_div_4 * moment[2] + distributed_force;
+	motor_force[2] = +l_div_4 * moment[0] - l_div_4 * moment[1] +
+	                 -b_div_4 * moment[2] + distributed_force;
+	motor_force[3] = -l_div_4 * moment[0] - l_div_4 * moment[1] +
+	                 +b_div_4 * moment[2] + distributed_force;
+
+	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(motor_force[0]));
+	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(motor_force[1]));
+	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(motor_force[2]));
+	set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(motor_force[3]));
+}
+void re_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 {
 	/* quadrotor thrust allocation */
 	float distributed_force = total_force *= 0.25; //split force to 4 motors
@@ -666,10 +684,10 @@ void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 	feedback_motor_force[3] = motor_force[3] / mat_data(theta)[3];
 
 	//for debug link
-	motor_thrust_amplified[0] = feedback_motor_force[0];
-	motor_thrust_amplified[1] = feedback_motor_force[1];
-	motor_thrust_amplified[2] = feedback_motor_force[2];
-	motor_thrust_amplified[3] = feedback_motor_force[3];
+	motor_thrust_normal[0] = feedback_motor_force[0];
+	motor_thrust_normal[1] = feedback_motor_force[1];
+	motor_thrust_normal[2] = feedback_motor_force[2];
+	motor_thrust_normal[3] = feedback_motor_force[3];
 
 	#endif
 
@@ -840,7 +858,12 @@ void multirotor_geometry_control(radio_t *rc, float *desired_heading)
 	lock_motor |= check_motor_lock_condition(rc->safety == true);
 
 	if(lock_motor == false) {
-		mr_geometry_ctrl_thrust_allocation(control_moments, control_force);
+		if(rc->auto_flight == true && height_availabe && heading_available) {
+			re_geometry_ctrl_thrust_allocation(control_moments, control_force);
+		}
+		else{
+			mr_geometry_ctrl_thrust_allocation(control_moments, control_force);
+		}
 	} else {
 		motor_halt();
 	}
@@ -921,36 +944,36 @@ void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 	pack_debug_debug_message_float(&T2, payload);
 	pack_debug_debug_message_float(&T3, payload);
 	pack_debug_debug_message_float(&T4, payload);	
-	//icl term
-	pack_debug_debug_message_float(&icl_term1, payload);
-	pack_debug_debug_message_float(&icl_term2, payload);
-	pack_debug_debug_message_float(&icl_term3, payload);
-	pack_debug_debug_message_float(&icl_term4, payload);	
+
 	//ex
 	pack_debug_debug_message_float(&pos_error[0], payload);
 	pack_debug_debug_message_float(&pos_error[1], payload);
 	pack_debug_debug_message_float(&pos_error[2], payload);	
-	
-	/*
-	//motor thrust amplified
-	pack_debug_debug_message_float(&motor_thrust_amplified[0], payload);
-	pack_debug_debug_message_float(&motor_thrust_amplified[1], payload);
-	pack_debug_debug_message_float(&motor_thrust_amplified[2], payload);
-	pack_debug_debug_message_float(&motor_thrust_amplified[3], payload);	
-	
-
 	//ev
 	pack_debug_debug_message_float(&vel_error[0], payload);
 	pack_debug_debug_message_float(&vel_error[1], payload);
 	pack_debug_debug_message_float(&vel_error[2], payload);	
 	//eR
-	pack_debug_debug_message_float(&roll_error[0], payload);
-	pack_debug_debug_message_float(&pitch_error[1], payload);
-	pack_debug_debug_message_float(&yaw_error[2], payload);	
+	pack_debug_debug_message_float(&roll_error, payload);
+	pack_debug_debug_message_float(&pitch_error, payload);
+	pack_debug_debug_message_float(&yaw_error, payload);	
 	//eW
-	pack_debug_debug_message_float(&wx_error[0], payload);
-	pack_debug_debug_message_float(&wy_error[1], payload);
-	pack_debug_debug_message_float(&wz_error[2], payload);	
+	pack_debug_debug_message_float(&wx_error, payload);
+	pack_debug_debug_message_float(&wy_error, payload);
+	pack_debug_debug_message_float(&wz_error, payload);	
+/*
+	//motor thrust original
+	pack_debug_debug_message_float(&motor_thrust_normal[0], payload);
+	pack_debug_debug_message_float(&motor_thrust_normal[1], payload);
+	pack_debug_debug_message_float(&motor_thrust_normal[2], payload);
+	pack_debug_debug_message_float(&motor_thrust_normal[3], payload);	
+	
+	//icl term
+	pack_debug_debug_message_float(&icl_term1, payload);
+	pack_debug_debug_message_float(&icl_term2, payload);
+	pack_debug_debug_message_float(&icl_term3, payload);
+	pack_debug_debug_message_float(&icl_term4, payload);	
+
 	*/
 
 	pack_debug_debug_message_float(&time_now, payload);
