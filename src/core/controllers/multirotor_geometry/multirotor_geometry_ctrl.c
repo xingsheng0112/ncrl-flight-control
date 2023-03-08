@@ -85,7 +85,14 @@ MAT_ALLOC(y_clT, 4, 4);
 MAT_ALLOC(y_clT_F_y_cltheta, 4, 1);
 MAT_ALLOC(ICL_theta_hat_dot, 4, 1);
 // ICL gain
-float Gamma_gain[4] = {30.0f, 30.0f, 30.0f, 30.0f};
+
+// tracking Gain 1 
+// initial 0.8*4
+// eff = 1.0*4
+//float Gamma_gain[4] = {10.0f, 10.0f, 10.0f, 10.0f};
+float Gamma_gain[4] = {12.0f, 12.0f, 12.0f, 12.0f};
+
+
 float k_icl_gain = 1;
 float gamma_k_icl[4] = {0.0f};
 int ICL_sigma_index = 0;
@@ -170,10 +177,10 @@ void geometry_ctrl_init(void)
 	MAT_INIT(ICL_control_term, 4, 1);
 	MAT_INIT(theta_hat_dot, 4, 1);
 	MAT_INIT(theta, 4, 1);
-	mat_data(theta)[0] = 1.0f;
-	mat_data(theta)[1] = 1.0f;
-	mat_data(theta)[2] = 1.0f;
-	mat_data(theta)[3] = 1.0f;
+	mat_data(theta)[0] = 0.7f;
+	mat_data(theta)[1] = 0.7f;
+	mat_data(theta)[2] = 0.7f;
+	mat_data(theta)[3] = 0.7f;
 
 	MAT_INIT(F, 4, 1);
 	MAT_INIT(motor_thrust, 4, 1);
@@ -692,10 +699,10 @@ void re_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 	#endif
 
 	// real efficiency 
-	float e1 = 1.0;//0.7;
-	float e2 = 1.0;//0.8;
-	float e3 = 1.0;//0.6;
-	float e4 = 1.0;//0.9;
+	float e1 = 0.9;//0.7;
+	float e2 = 0.9;//0.8;
+	float e3 = 0.9;//0.6;
+	float e4 = 0.9;//0.9;
 	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(feedback_motor_force[0]*e1));
 	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(feedback_motor_force[1]*e2));
 	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(feedback_motor_force[2]*e3));
