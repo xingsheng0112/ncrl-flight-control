@@ -370,25 +370,6 @@ void geometry_manual_ctrl(euler_t *rc, float *attitude_q, float *gyro, float *ou
 	mat_data(inertia_effect)[1] = mat_data(WJW)[1];
 	mat_data(inertia_effect)[2] = mat_data(WJW)[2];
 
-#if 0   /* inertia feedfoward term for motion planning (trajectory is known) */
-	/* calculate inertia effect (trajectory is defined, Wd and Wd_dot are not zero) */
-	//W * R^T * Rd * Wd
-	hat_map_3x3(mat_data(W), mat_data(W_hat));
-	MAT_MULT(&W_hat, &Rt, &WRt);
-	MAT_MULT(&WRt, &Rd, &WRtRd);
-	MAT_MULT(&WRtRd, &Wd, &WRtRdWd);
-	//R^T * Rd * Wd_dot
-	//MAT_MULT(&Rt, &Rd, &RtRd); //the term is duplicated
-	MAT_MULT(&RtRd, &Wd_dot, &RtRdWddot);
-	//(W * R^T * Rd * Wd) - (R^T * Rd * Wd_dot)
-	MAT_SUB(&WRtRdWd, &RtRdWddot, &WRtRdWd_RtRdWddot);
-	//J*[(W * R^T * Rd * Wd) - (R^T * Rd * Wd_dot)]
-	MAT_MULT(&J, &WRtRdWd_RtRdWddot, &J_WRtRdWd_RtRdWddot);
-	//inertia effect = (W x JW) - J*[(W * R^T * Rd * Wd) - (R^T * Rd * Wd_dot)]
-	MAT_SUB(&WJW, &J_WRtRdWd_RtRdWddot, &inertia_effect);
-
-#endif
-
 	/* control input M1, M2, M3 */
 	output_moments[0] = -krx*mat_data(eR)[0] -kwx*mat_data(eW)[0] + mat_data(inertia_effect)[0];
 	output_moments[1] = -kry*mat_data(eR)[1] -kwy*mat_data(eW)[1] + mat_data(inertia_effect)[1];
@@ -537,10 +518,7 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
 
 
-
-	#if (SELECT_ESTIMATOR == WITHOUT_ESTIMATOR)
-	
-	#elif (SELECT_ESTIMATOR == WITH_ESTIMATOR)
+	/*
 	// Do icl here, don't need to modify the controller above 
 	float mge3_mvdot_dt[3] = {0.0f};
 	float Y_F = 0.0f;
@@ -634,8 +612,7 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	mat_data(theta)[1] = mat_data(theta)[1] + mat_data(ICL_theta_hat_dot)[1] * dt;
 	mat_data(theta)[2] = mat_data(theta)[2] + mat_data(ICL_theta_hat_dot)[2] * dt;
 	mat_data(theta)[3] = mat_data(theta)[3] + mat_data(ICL_theta_hat_dot)[3] * dt;
-	#endif
-
+	*/
 }
 
 #define l_div_4 (0.25f * (1.0f / MOTOR_TO_CG_LENGTH_M))
@@ -831,13 +808,108 @@ void multirotor_geometry_control(radio_t *rc, float *desired_heading)
 		                       pos_des_enu, vel_des_enu, accel_ff_enu,
 		                       curr_pos_ned, curr_vel_ned, control_moments,
 		                       &control_force, height_ctrl_only);
-	} else {
+	} 
+	else 
+	{
 		/* manual flight mode (attitude control only) */
 		geometry_manual_ctrl(&attitude_cmd, attitude_q, gyro, control_moments,
 		                     heading_available);
 
 		/* generate total thrust for quadrotor (open-loop) */
 		control_force = 4.0f * convert_motor_cmd_to_thrust(rc->throttle * 0.01 /* [%] */);
+
+		float mge3_mvdot_dt[3] = {0.0f};
+		float Y_F = 0.0f;
+		mge3_mvdot_dt[0] =  0 - uav_mass*curr_vel_ned[0];
+		mge3_mvdot_dt[1] =  0 - uav_mass*curr_vel_ned[1];
+		mge3_mvdot_dt[2] =  uav_mass*9.81*dt - uav_mass*curr_vel_ned[2];
+
+
+		Y_F = 	mge3_mvdot_dt[0]*mat_data(Re3)[0]+
+				mge3_mvdot_dt[1]*mat_data(Re3)[1]+
+				mge3_mvdot_dt[2]*mat_data(Re3)[2];	
+		float Y_M[3] = {0.0f};
+		Y_M[0] = mat_data(J)[0]*mat_data(W)[0] + mat_data(W)[1]*mat_data(W)[2]*(mat_data(J)[8] - mat_data(J)[4])*dt;
+		Y_M[1] = mat_data(J)[4]*mat_data(W)[1] + mat_data(W)[0]*mat_data(W)[2]*(mat_data(J)[0] - mat_data(J)[8])*dt;
+		Y_M[2] = mat_data(J)[8]*mat_data(W)[2] + mat_data(W)[0]*mat_data(W)[1]*(mat_data(J)[4] - mat_data(J)[0])*dt;
+
+		mat_data(S)[0] = Y_F;
+		mat_data(S)[1] = Y_M[0];
+		mat_data(S)[2] = Y_M[1];
+		mat_data(S)[3] = Y_M[2];
+
+		mat_data(Y)[0*4 + 0] = mat_data(motor_thrust)[0];
+		mat_data(Y)[0*4 + 1] = mat_data(motor_thrust)[1];
+		mat_data(Y)[0*4 + 2] = mat_data(motor_thrust)[2];
+		mat_data(Y)[0*4 + 3] = mat_data(motor_thrust)[3];
+		mat_data(Y)[1*4 + 0] = -MOTOR_TO_CG_LENGTH_M * mat_data(motor_thrust)[0];
+		mat_data(Y)[1*4 + 1] =  MOTOR_TO_CG_LENGTH_M * mat_data(motor_thrust)[1];
+		mat_data(Y)[1*4 + 2] =  MOTOR_TO_CG_LENGTH_M * mat_data(motor_thrust)[2];
+		mat_data(Y)[1*4 + 3] = -MOTOR_TO_CG_LENGTH_M * mat_data(motor_thrust)[3];
+		mat_data(Y)[2*4 + 0] =  MOTOR_TO_CG_LENGTH_M * mat_data(motor_thrust)[0];
+		mat_data(Y)[2*4 + 1] =  MOTOR_TO_CG_LENGTH_M * mat_data(motor_thrust)[1];
+		mat_data(Y)[2*4 + 2] = -MOTOR_TO_CG_LENGTH_M * mat_data(motor_thrust)[2];
+		mat_data(Y)[2*4 + 3] = -MOTOR_TO_CG_LENGTH_M * mat_data(motor_thrust)[3];
+		mat_data(Y)[3*4 + 0] = -COEFFICIENT_YAW * mat_data(motor_thrust)[0];
+		mat_data(Y)[3*4 + 1] =  COEFFICIENT_YAW * mat_data(motor_thrust)[1];
+		mat_data(Y)[3*4 + 2] = -COEFFICIENT_YAW * mat_data(motor_thrust)[2];
+		mat_data(Y)[3*4 + 3] =  COEFFICIENT_YAW * mat_data(motor_thrust)[3];
+		MAT_SCALE(&Y, dt, &Y_dt);
+
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[0] = mat_data(Y_dt)[0];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[1] = mat_data(Y_dt)[1];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[2] = mat_data(Y_dt)[2];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[3] = mat_data(Y_dt)[3];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[4] = mat_data(Y_dt)[4];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[5] = mat_data(Y_dt)[5];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[6] = mat_data(Y_dt)[6];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[7] = mat_data(Y_dt)[7];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[8] = mat_data(Y_dt)[8];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[9] = mat_data(Y_dt)[9];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[10] = mat_data(Y_dt)[10];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[11] = mat_data(Y_dt)[11];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[12] = mat_data(Y_dt)[12];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[13] = mat_data(Y_dt)[13];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[14] = mat_data(Y_dt)[14];
+		mat_data(sigma_array[ICL_sigma_index].y_cl)[15] = mat_data(Y_dt)[15];
+
+
+		mat_data(sigma_array[ICL_sigma_index].F)[0] = mat_data(S)[0];
+		mat_data(sigma_array[ICL_sigma_index].F)[1] = mat_data(S)[1];
+		mat_data(sigma_array[ICL_sigma_index].F)[2] = mat_data(S)[2];
+		mat_data(sigma_array[ICL_sigma_index].F)[3] = mat_data(S)[3];
+
+
+		ICL_sigma_index ++;
+		ICL_sigma_index %= ICL_N;
+		
+		//===================//
+		mat_data(ICL_control_term)[0] = 0;
+		mat_data(ICL_control_term)[1] = 0;
+		mat_data(ICL_control_term)[2] = 0;
+		mat_data(ICL_control_term)[3] = 0;
+		for(int i = 0 ; i<ICL_N ; i++){
+			MAT_MULT(&sigma_array[i].y_cl, &theta, &y_cltheta);
+			MAT_SUB(&sigma_array[i].F, &y_cltheta, &F_y_cltheta);
+			MAT_TRANS(&sigma_array[i].y_cl,&y_clT);
+						
+			MAT_MULT(&y_clT, &F_y_cltheta, &y_clT_F_y_cltheta);
+
+			mat_data(ICL_control_term)[0] = mat_data(ICL_control_term)[0] + mat_data(y_clT_F_y_cltheta)[0]; 
+			mat_data(ICL_control_term)[1] = mat_data(ICL_control_term)[1] + mat_data(y_clT_F_y_cltheta)[1];
+			mat_data(ICL_control_term)[2] = mat_data(ICL_control_term)[2] + mat_data(y_clT_F_y_cltheta)[2];
+			mat_data(ICL_control_term)[3] = mat_data(ICL_control_term)[3] + mat_data(y_clT_F_y_cltheta)[3];
+		}
+		
+		mat_data(ICL_theta_hat_dot)[0] = gamma_k_icl[0]*mat_data(ICL_control_term)[0];
+		mat_data(ICL_theta_hat_dot)[1] = gamma_k_icl[1]*mat_data(ICL_control_term)[1];
+		mat_data(ICL_theta_hat_dot)[2] = gamma_k_icl[2]*mat_data(ICL_control_term)[2];
+		mat_data(ICL_theta_hat_dot)[3] = gamma_k_icl[3]*mat_data(ICL_control_term)[3];
+
+		mat_data(theta)[0] = mat_data(theta)[0] + mat_data(ICL_theta_hat_dot)[0] * dt;
+		mat_data(theta)[1] = mat_data(theta)[1] + mat_data(ICL_theta_hat_dot)[1] * dt;
+		mat_data(theta)[2] = mat_data(theta)[2] + mat_data(ICL_theta_hat_dot)[2] * dt;
+		mat_data(theta)[3] = mat_data(theta)[3] + mat_data(ICL_theta_hat_dot)[3] * dt;
 	}
 
 	if(rc->safety == true) {
