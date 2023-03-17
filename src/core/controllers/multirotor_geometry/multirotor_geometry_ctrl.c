@@ -90,8 +90,10 @@ MAT_ALLOC(ICL_theta_hat_dot, 4, 1);
 // initial 0.8*4
 // eff = 1.0*4
 //float Gamma_gain[4] = {10.0f, 10.0f, 10.0f, 10.0f};
-float Gamma_gain[4] = {4.0f, 4.0f, 4.0f, 4.0f};
-
+//float Gamma_gain[4] = {2.0f, 2.0f, 2.0f, 2.0f};
+//gain for 0.6/0.7/0.9/0.8
+//float Gamma_gain[4] = {1.5f, 2.7f, 6.2f, 4.2f};
+float Gamma_gain[4] = {1.4f, 3.4f, 8.0f, 6.2f};
 
 float k_icl_gain = 1;
 float gamma_k_icl[4] = {0.0f};
@@ -177,10 +179,10 @@ void geometry_ctrl_init(void)
 	MAT_INIT(ICL_control_term, 4, 1);
 	MAT_INIT(theta_hat_dot, 4, 1);
 	MAT_INIT(theta, 4, 1);
-	mat_data(theta)[0] = 1.0f;
-	mat_data(theta)[1] = 1.0f;
-	mat_data(theta)[2] = 1.0f;
-	mat_data(theta)[3] = 1.0f;
+	mat_data(theta)[0] = 0.3f;
+	mat_data(theta)[1] = 0.3f;
+	mat_data(theta)[2] = 0.3f;
+	mat_data(theta)[3] = 0.3f;
 
 	MAT_INIT(F, 4, 1);
 	MAT_INIT(motor_thrust, 4, 1);
@@ -476,8 +478,8 @@ void geometry_manual_ctrl(euler_t *rc, float *attitude_q, float *gyro, float *ou
 		if(mat_data(theta)[i] > 1){
 			mat_data(theta)[i] = 1;
 		}
-		if(mat_data(theta)[i] < 0.4){
-			mat_data(theta)[i] = 0.4;
+		if(mat_data(theta)[i] < 0.3){
+			mat_data(theta)[i] = 0.3;
 		}
 	}
 }
@@ -487,10 +489,6 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
                             float *curr_pos_ned, float *curr_vel_ned, float *output_moments,
                             float *output_force, bool manual_flight)
 {
-	Gamma_gain[0] = 0.001f;
-	Gamma_gain[1] = 0.001f;
-	Gamma_gain[2] = 0.001f;
-	Gamma_gain[3] = 0.001f;
 	/* ex = x - xd */
 	float pos_des_ned[3];
 	assign_vector_3x1_enu_to_ned(pos_des_ned, pos_des_enu);
@@ -711,7 +709,10 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 		mat_data(ICL_control_term)[2] = mat_data(ICL_control_term)[2] + mat_data(y_clT_F_y_cltheta)[2];
 		mat_data(ICL_control_term)[3] = mat_data(ICL_control_term)[3] + mat_data(y_clT_F_y_cltheta)[3];
 	}
-	
+	gamma_k_icl[0] = 0.05;
+	gamma_k_icl[1] = 0.05;
+	gamma_k_icl[2] = 0.05;
+	gamma_k_icl[3] = 0.05;
 	mat_data(ICL_theta_hat_dot)[0] = gamma_k_icl[0]*mat_data(ICL_control_term)[0];
 	mat_data(ICL_theta_hat_dot)[1] = gamma_k_icl[1]*mat_data(ICL_control_term)[1];
 	mat_data(ICL_theta_hat_dot)[2] = gamma_k_icl[2]*mat_data(ICL_control_term)[2];
@@ -725,8 +726,8 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 		if(mat_data(theta)[i] > 1){
 			mat_data(theta)[i] = 1;
 		}
-		if(mat_data(theta)[i] < 0.4){
-			mat_data(theta)[i] = 0.4;
+		if(mat_data(theta)[i] < 0.3){
+			mat_data(theta)[i] = 0.3;
 		}
 	}
 
@@ -790,10 +791,14 @@ void re_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 	#endif
 
 	// real efficiency 
-	float e1 = 0.9;//0.7;
-	float e2 = 0.9;//0.8;
-	float e3 = 0.9;//0.6;
-	float e4 = 0.9;//0.9;
+	float e1 = 0.4;//0.6;
+	float e2 = 0.6;//0.7;
+	float e3 = 0.9;//0.9;
+	float e4 = 0.8;//0.8;
+//	float e1 = 1.0;//0.7;
+//	float e2 = 1.0;//0.8;
+//	float e3 = 1.0;//0.6;
+//	float e4 = 1.0;//0.9;
 	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(feedback_motor_force[0]*e1));
 	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(feedback_motor_force[1]*e2));
 	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(feedback_motor_force[2]*e3));
@@ -956,7 +961,12 @@ void multirotor_geometry_control(radio_t *rc, float *desired_heading)
 	lock_motor |= check_motor_lock_condition(autopilot_get_mode() == AUTOPILOT_MOTOR_LOCKED_MODE);
 	//lock motor if radio safety botton is on
 	lock_motor |= check_motor_lock_condition(rc->safety == true);
-
+	if(lock_motor == false) {
+		re_geometry_ctrl_thrust_allocation(control_moments, control_force);
+	} else {
+		motor_halt();
+	}
+	/*
 	if(lock_motor == false) {
 		if(rc->auto_flight == true && height_availabe && heading_available) {
 			re_geometry_ctrl_thrust_allocation(control_moments, control_force);
@@ -967,6 +977,7 @@ void multirotor_geometry_control(radio_t *rc, float *desired_heading)
 	} else {
 		motor_halt();
 	}
+	*/
 }
 
 void send_geometry_moment_ctrl_debug(debug_msg_t *payload)
@@ -1030,8 +1041,10 @@ void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 	float icl_term2 = mat_data(ICL_theta_hat_dot)[1];
 	float icl_term3 = mat_data(ICL_theta_hat_dot)[2];
 	float icl_term4 = mat_data(ICL_theta_hat_dot)[3];
-	float time_now = get_sys_time_s();
-	
+
+	float R1 = mat_data(R)[0];
+	float R2 = mat_data(R)[4];
+	float R3 = mat_data(R)[8];
 	pack_debug_debug_message_header(payload, MESSAGE_ID_ICL_ESTIMATION);
 
 	//theta
@@ -1044,11 +1057,16 @@ void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 	pack_debug_debug_message_float(&T2, payload);
 	pack_debug_debug_message_float(&T3, payload);
 	pack_debug_debug_message_float(&T4, payload);	
-
 	//ex
 	pack_debug_debug_message_float(&pos_error[0], payload);
 	pack_debug_debug_message_float(&pos_error[1], payload);
-	pack_debug_debug_message_float(&pos_error[2], payload);	
+	pack_debug_debug_message_float(&pos_error[2], payload);
+
+	pack_debug_debug_message_float(&icl_term1, payload);
+	pack_debug_debug_message_float(&icl_term2, payload);
+	pack_debug_debug_message_float(&icl_term3, payload);
+	pack_debug_debug_message_float(&icl_term4, payload);	
+
 	/*
 	//ev
 	pack_debug_debug_message_float(&vel_error[0], payload);
@@ -1062,20 +1080,19 @@ void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 	pack_debug_debug_message_float(&wx_error, payload);
 	pack_debug_debug_message_float(&wy_error, payload);
 	pack_debug_debug_message_float(&wz_error, payload);	
-	*/
-/*
+	
+	//attitude
+	pack_debug_debug_message_float(&R1, payload);
+	pack_debug_debug_message_float(&R2, payload);
+	pack_debug_debug_message_float(&R3, payload);	
 	//motor thrust original
 	pack_debug_debug_message_float(&motor_thrust_normal[0], payload);
 	pack_debug_debug_message_float(&motor_thrust_normal[1], payload);
 	pack_debug_debug_message_float(&motor_thrust_normal[2], payload);
 	pack_debug_debug_message_float(&motor_thrust_normal[3], payload);	
 	*/
-	//icl term
-	pack_debug_debug_message_float(&icl_term1, payload);
-	pack_debug_debug_message_float(&icl_term2, payload);
-	pack_debug_debug_message_float(&icl_term3, payload);
-	pack_debug_debug_message_float(&icl_term4, payload);	
 
+	float time_now = get_sys_time_s();
 
 	pack_debug_debug_message_float(&time_now, payload);
 }
