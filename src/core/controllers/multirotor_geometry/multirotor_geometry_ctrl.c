@@ -93,7 +93,20 @@ MAT_ALLOC(ICL_theta_hat_dot, 4, 1);
 //float Gamma_gain[4] = {2.0f, 2.0f, 2.0f, 2.0f};
 //gain for 0.6/0.7/0.9/0.8
 //float Gamma_gain[4] = {1.5f, 2.7f, 6.2f, 4.2f};
-float Gamma_gain[4] = {1.4f, 3.4f, 8.0f, 6.2f};
+
+//*************//
+//gain for 0.4 to 0.4/0.6/0.9/0.8
+//float Gamma_gain[4] = {1.3f, 3.4f, 8.0f, 6.2f};
+float Gamma_gain[4] = {1.15f, 3.0f, 6.8f, 5.2f};
+// kx = 10,10,32;
+// kv = 4,4,8;
+
+
+
+//gain for 1.0 to 0.4/0.6/0.9/0.8
+//float Gamma_gain[4] = {10.6f, 6.0f, 1.7f, 3.2f};
+// kx = 10,10,35;
+// kv = 6.5,6.5,12;
 
 float k_icl_gain = 1;
 float gamma_k_icl[4] = {0.0f};
@@ -709,10 +722,10 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 		mat_data(ICL_control_term)[2] = mat_data(ICL_control_term)[2] + mat_data(y_clT_F_y_cltheta)[2];
 		mat_data(ICL_control_term)[3] = mat_data(ICL_control_term)[3] + mat_data(y_clT_F_y_cltheta)[3];
 	}
-	gamma_k_icl[0] = 0.05;
-	gamma_k_icl[1] = 0.05;
-	gamma_k_icl[2] = 0.05;
-	gamma_k_icl[3] = 0.05;
+	gamma_k_icl[0] = 0.2;
+	gamma_k_icl[1] = 0.2;
+	gamma_k_icl[2] = 0.2;
+	gamma_k_icl[3] = 0.2;
 	mat_data(ICL_theta_hat_dot)[0] = gamma_k_icl[0]*mat_data(ICL_control_term)[0];
 	mat_data(ICL_theta_hat_dot)[1] = gamma_k_icl[1]*mat_data(ICL_control_term)[1];
 	mat_data(ICL_theta_hat_dot)[2] = gamma_k_icl[2]*mat_data(ICL_control_term)[2];
@@ -1067,7 +1080,7 @@ void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 	pack_debug_debug_message_float(&icl_term3, payload);
 	pack_debug_debug_message_float(&icl_term4, payload);	
 
-	/*
+
 	//ev
 	pack_debug_debug_message_float(&vel_error[0], payload);
 	pack_debug_debug_message_float(&vel_error[1], payload);
@@ -1076,6 +1089,7 @@ void send_controller_estimation_adaptive_debug(debug_msg_t *payload)
 	pack_debug_debug_message_float(&roll_error, payload);
 	pack_debug_debug_message_float(&pitch_error, payload);
 	pack_debug_debug_message_float(&yaw_error, payload);	
+		/*
 	//eW
 	pack_debug_debug_message_float(&wx_error, payload);
 	pack_debug_debug_message_float(&wy_error, payload);
