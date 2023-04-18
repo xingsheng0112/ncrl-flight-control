@@ -100,13 +100,24 @@ MAT_ALLOC(ICL_theta_hat_dot, 4, 1);
 float Gamma_gain[4] = {1.15f, 3.0f, 6.8f, 5.2f};
 // kx = 10,10,32;
 // kv = 4,4,8;
-
+// kR = 2.95, 2.95, 28.4;
+// kW = 0.36, 0.36, 1.96;
 
 
 //gain for 1.0 to 0.4/0.6/0.9/0.8
 //float Gamma_gain[4] = {10.6f, 6.0f, 1.7f, 3.2f};
 // kx = 10,10,35;
 // kv = 6.5,6.5,12;
+
+
+
+//gain for the geometric controller
+// kx = 10, 10, 35;
+// kv = 12, 12, 12;
+// kR = 3.5, 3.5. 34.08;
+// kW = 0.7, 0.7, 2.352;
+
+
 
 float k_icl_gain = 1;
 float gamma_k_icl[4] = {0.0f};
