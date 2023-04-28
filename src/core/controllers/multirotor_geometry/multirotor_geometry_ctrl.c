@@ -28,7 +28,7 @@
 #include "sensor_switching.h"
 
 #define dt 0.0025 //[s]
-#define MOTOR_TO_CG_LENGTH 16.25f //[cm]
+#define MOTOR_TO_CG_LENGTH 27.5f //[cm]
 #define MOTOR_TO_CG_LENGTH_M (MOTOR_TO_CG_LENGTH * 0.01) //[m]
 #define COEFFICIENT_YAW 1.0f
 
@@ -470,8 +470,8 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
 }
 
-#define l_div_4 (0.25f * (1.0f / MOTOR_TO_CG_LENGTH_M))
-#define b_div_4 (+0.25f * (1.0f / COEFFICIENT_YAW))
+#define l_div_4 (0.167f * (1.0f / MOTOR_TO_CG_LENGTH_M))
+#define b_div_4 (+0.167f * (1.0f / COEFFICIENT_YAW))
 void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 {
 	/* quadrotor thrust allocation */
