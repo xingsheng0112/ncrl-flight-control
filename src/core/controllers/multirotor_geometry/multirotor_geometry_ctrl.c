@@ -714,10 +714,47 @@ void send_geometry_moment_ctrl_debug(debug_msg_t *payload)
 
 void send_geometry_tracking_ctrl_debug(debug_msg_t *payload)
 {
-	pack_debug_debug_message_header(payload, MESSAGE_ID_GEOMETRY_TRACKING_CTRL);
+	float roll_error = rad_to_deg(mat_data(eR)[0]);
+	float pitch_error = rad_to_deg(mat_data(eR)[1]);
+	float yaw_error = rad_to_deg(mat_data(eR)[2]);
+
+	float wx_error = rad_to_deg(mat_data(eW)[0]);
+	float wy_error = rad_to_deg(mat_data(eW)[1]);
+	float wz_error = rad_to_deg(mat_data(eW)[2]);
+
+
+	float T1 = mat_data(motor_thrust)[0];
+	float T2 = mat_data(motor_thrust)[1];
+	float T3 = mat_data(motor_thrust)[2];
+	float T4 = mat_data(motor_thrust)[3];
+
+	float time_now = get_sys_time_s();
+	
+	pack_debug_debug_message_header(payload, MESSAGE_ID_ICL_ESTIMATION);
+	//motor thrust
+	pack_debug_debug_message_float(&T1, payload);
+	pack_debug_debug_message_float(&T2, payload);
+	pack_debug_debug_message_float(&T3, payload);
+	pack_debug_debug_message_float(&T4, payload);	
+
+	//ex
 	pack_debug_debug_message_float(&pos_error[0], payload);
 	pack_debug_debug_message_float(&pos_error[1], payload);
-	pack_debug_debug_message_float(&pos_error[2], payload);
+	pack_debug_debug_message_float(&pos_error[2], payload);	
+	//ev
+	pack_debug_debug_message_float(&vel_error[0], payload);
+	pack_debug_debug_message_float(&vel_error[1], payload);
+	pack_debug_debug_message_float(&vel_error[2], payload);	
+	//eR
+	pack_debug_debug_message_float(&roll_error, payload);
+	pack_debug_debug_message_float(&pitch_error, payload);
+	pack_debug_debug_message_float(&yaw_error, payload);	
+	//eW
+	pack_debug_debug_message_float(&wx_error, payload);
+	pack_debug_debug_message_float(&wy_error, payload);
+	pack_debug_debug_message_float(&wz_error, payload);	
+	
+	pack_debug_debug_message_float(&time_now, payload);
 }
 
 void send_uav_dynamics_debug(debug_msg_t *payload)
