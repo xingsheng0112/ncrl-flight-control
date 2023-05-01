@@ -63,10 +63,10 @@ void pwm_timer4_init(void)
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
 
 	GPIO_PinAFConfig(GPIOD, GPIO_PinSource13, GPIO_AF_TIM4);
-	//GPIO_PinAFConfig(GPIOD, GPIO_PinSource14, GPIO_AF_TIM4);
+	GPIO_PinAFConfig(GPIOD, GPIO_PinSource14, GPIO_AF_TIM4);
 
 	GPIO_InitTypeDef GPIO_InitStruct = {
-		.GPIO_Pin =  GPIO_Pin_13,
+		.GPIO_Pin =  GPIO_Pin_13| GPIO_Pin_14,
 		.GPIO_Mode = GPIO_Mode_AF,
 		.GPIO_Speed = GPIO_Speed_100MHz,
 		.GPIO_OType = GPIO_OType_PP,
@@ -75,10 +75,10 @@ void pwm_timer4_init(void)
 
 	GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-	/* motor6: vins mono camera triggering (gpio mode) */
-	GPIO_InitStruct.GPIO_Pin = GPIO_Pin_14;
-	GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT;
-	GPIO_Init(GPIOD, &GPIO_InitStruct);
+	// /* motor6: vins mono camera triggering (gpio mode) */
+	// GPIO_InitStruct.GPIO_Pin = GPIO_Pin_14;
+	// GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT;
+	// GPIO_Init(GPIOD, &GPIO_InitStruct);
 
 	/* 90MHz / (25000 * 9) = 400Hz = 0.0025s */
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStruct = {
@@ -97,7 +97,7 @@ void pwm_timer4_init(void)
 	};
 
 	TIM_OC2Init(TIM4, &TIM_OCInitStruct);
-	//TIM_OC3Init(TIM4, &TIM_OCInitStruct);
+	TIM_OC3Init(TIM4, &TIM_OCInitStruct);
 
 	TIM_Cmd(TIM4, ENABLE);
 }

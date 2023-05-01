@@ -11,7 +11,8 @@
 #define MOTOR3 &TIM1->CCR2
 #define MOTOR4 &TIM1->CCR1
 #define MOTOR5 &TIM4->CCR2
-#define MOTOR6 GPIOD, GPIO_Pin_14 //vins-mono camera triggering
+#define MOTOR6 &TIM4->CCR3
+//#define MOTOR6 GPIOD, GPIO_Pin_14 //vins-mono camera triggering
 
 #define EXT_SW GPIOB, GPIO_Pin_14 //XXX: external switch's porting is not complete
 

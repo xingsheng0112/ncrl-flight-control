@@ -1,3 +1,4 @@
+#include "proj_config.h"
 #include "arm_math.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -28,8 +29,8 @@
 #include "sensor_switching.h"
 
 #define dt 0.0025 //[s]
-#define MOTOR_TO_CG_LENGTH 27.5f //[cm]
-#define MOTOR_TO_CG_LENGTH_M (MOTOR_TO_CG_LENGTH * 0.01) //[m]
+//#define MOTOR_TO_CG_LENGTH 27.5f //[cm]
+//#define MOTOR_TO_CG_LENGTH_M (MOTOR_TO_CG_LENGTH * 0.01) //[m]
 #define COEFFICIENT_YAW 1.0f
 
 MAT_ALLOC(J, 3, 3);
@@ -64,6 +65,7 @@ MAT_ALLOC(kxex_kvev_mge3_mxd_dot_dot, 3, 1);
 MAT_ALLOC(b1d, 3, 1);
 MAT_ALLOC(b2d, 3, 1);
 MAT_ALLOC(b3d, 3, 1);
+MAT_ALLOC(motor_thrust, 6, 1);
 
 float pos_error[3];
 float vel_error[3];
@@ -132,6 +134,7 @@ void geometry_ctrl_init(void)
 	MAT_INIT(b1d, 3, 1);
 	MAT_INIT(b2d, 3, 1);
 	MAT_INIT(b3d, 3, 1);
+	MAT_INIT(motor_thrust, 6, 1);
 
 	/* modify local variables when user change them via ground station */
 	set_sys_param_update_var_addr(MR_GEO_GAIN_ROLL_P, &krx);
@@ -470,27 +473,46 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
 }
 
-#define l_div_4 (0.167f * (1.0f / MOTOR_TO_CG_LENGTH_M))
 #define b_div_4 (+0.167f * (1.0f / COEFFICIENT_YAW))
+
 void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 {
 	/* quadrotor thrust allocation */
-	float distributed_force = total_force *= 0.25; //split force to 4 motors
-	float motor_force[4];
-	motor_force[0] = -l_div_4 * moment[0] + l_div_4 * moment[1] +
+	float distributed_force = total_force *= 0.167; //split force to 4 motors
+	float motor_force[6];
+	motor_force[0] = -0.167f*(1.0f/0.1375f) * moment[0] + 0.167f*(1.0f/0.1588f) * moment[1] +
 	                 -b_div_4 * moment[2] + distributed_force;
-	motor_force[1] = +l_div_4 * moment[0] + l_div_4 * moment[1] +
+
+	motor_force[1] = +0.167f*(1.0f/0.1375f) * moment[0] + 0.167f*(1.0f/0.1588f) * moment[1] +
 	                 +b_div_4 * moment[2] + distributed_force;
-	motor_force[2] = +l_div_4 * moment[0] - l_div_4 * moment[1] +
+
+	motor_force[2] = +0.167f*(1.0f/0.275f) * moment[0]  + 0 * moment[1] +
 	                 -b_div_4 * moment[2] + distributed_force;
-	motor_force[3] = -l_div_4 * moment[0] - l_div_4 * moment[1] +
+
+	motor_force[3] = +0.167f*(1.0f/0.1375f) * moment[0] - 0.167f*(1.0f/0.1588f) * moment[1] +
+	                 +b_div_4 * moment[2] + distributed_force;
+
+	motor_force[4] = -0.167f*(1.0f/0.1375f) * moment[0] - 0.167f*(1.0f/0.1588f) * moment[1] +
+	                 -b_div_4 * moment[2] + distributed_force;
+
+	motor_force[5] = -0.167f*(1.0f/0.275f) * moment[0]  + 0 * moment[1] +
 	                 +b_div_4 * moment[2] + distributed_force;
 
 	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(motor_force[0]));
 	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(motor_force[1]));
 	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(motor_force[2]));
 	set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(motor_force[3]));
+	set_motor_value(MOTOR5, convert_motor_thrust_to_cmd(motor_force[4]));
+	set_motor_value(MOTOR6, convert_motor_thrust_to_cmd(motor_force[5]));
+
+	mat_data(motor_thrust)[0] = motor_force[0];
+	mat_data(motor_thrust)[1] = motor_force[1];
+	mat_data(motor_thrust)[2] = motor_force[2];
+	mat_data(motor_thrust)[3] = motor_force[3];
+	mat_data(motor_thrust)[4] = motor_force[4];
+	mat_data(motor_thrust)[5] = motor_force[5];
 }
+
 
 void rc_mode_handler_geometry_ctrl(radio_t *rc)
 {
@@ -619,7 +641,7 @@ void multirotor_geometry_control(radio_t *rc)
 		                     heading_available);
 
 		/* generate total thrust for quadrotor (open-loop) */
-		control_force = 4.0f * convert_motor_cmd_to_thrust(rc->throttle * 0.01 /* [%] */);
+		control_force = 6.0f * convert_motor_cmd_to_thrust(rc->throttle * 0.01 /* [%] */);
 	}
 
 	if(rc->safety == true) {
