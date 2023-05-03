@@ -51,6 +51,19 @@
 #define QUADROTOR_USE_GEOMETRY 2
 #define SELECT_CONTROLLER QUADROTOR_USE_GEOMETRY
 
+
+/* quadrotor control estimation algorithms */
+#define WITHOUT_ESTIMATOR 0
+#define WITH_ESTIMATOR 1
+#define SELECT_ESTIMATOR WITH_ESTIMATOR
+
+/* quadrotor control estimation algorithms */
+#define CONTROLLER_ESTIMATION_USE_ORIGIN 0
+#define CONTROLLER_ESTIMATION_USE_NONE 1
+#define CONTROLLER_ESTIMATION_USE_ADAPTIVE 1
+#define CONTROLLER_ESTIMATION_USE_ICL 3
+#define SELECT_CONTROLLER_ESTIMATOR CONTROLLER_ESTIMATION_USE_ICL 
+
 /*===================*
  * hardware settings *
  *===================*/
