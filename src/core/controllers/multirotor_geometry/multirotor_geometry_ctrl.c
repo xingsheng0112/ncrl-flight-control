@@ -31,7 +31,15 @@
 #define dt 0.0025 //[s]
 //#define MOTOR_TO_CG_LENGTH 27.5f //[cm]
 //#define MOTOR_TO_CG_LENGTH_M (MOTOR_TO_CG_LENGTH * 0.01) //[m]
-#define COEFFICIENT_YAW 1.0f
+#define COEFFICIENT_YAW 0.5f
+
+// geometric controller gain
+// kx = 8, 8, 40
+// kv = 6, 6, 16
+// kr = 3.1, 3.35, 45
+// kW = 0.4, 0.63, 2.8
+// yaw rate = 35
+// mass = 1.8
 
 MAT_ALLOC(J, 3, 3);
 MAT_ALLOC(R, 3, 3);
@@ -473,29 +481,29 @@ void geometry_tracking_ctrl(euler_t *rc, float *attitude_q, float *gyro,
 	output_moments[2] = -krz*mat_data(eR)[2] -kwz*mat_data(eW)[2] + mat_data(inertia_effect)[2];
 }
 
-#define b_div_4 (+0.167f * (1.0f / COEFFICIENT_YAW))
+#define b_div_4 (+0.16667f * (1.0f / COEFFICIENT_YAW))
 
 void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 {
 	/* quadrotor thrust allocation */
-	float distributed_force = total_force *= 0.167; //split force to 4 motors
+	float distributed_force = total_force *= 0.16667f; //split force to 4 motors
 	float motor_force[6];
-	motor_force[0] = -0.167f*(1.0f/0.1375f) * moment[0] + 0.167f*(1.0f/0.1588f) * moment[1] +
+	motor_force[0] = -0.606061f * moment[0] + 1.04973f * moment[1] +
 	                 -b_div_4 * moment[2] + distributed_force;
 
-	motor_force[1] = +0.167f*(1.0f/0.1375f) * moment[0] + 0.167f*(1.0f/0.1588f) * moment[1] +
+	motor_force[1] = +0.606061f * moment[0] + 1.04973f * moment[1] +
 	                 +b_div_4 * moment[2] + distributed_force;
 
-	motor_force[2] = +0.167f*(1.0f/0.275f) * moment[0]  + 0 * moment[1] +
+	motor_force[2] = +1.212121f*(1.0f/0.275f) * moment[0]  + 0 * moment[1] +
 	                 -b_div_4 * moment[2] + distributed_force;
 
-	motor_force[3] = +0.167f*(1.0f/0.1375f) * moment[0] - 0.167f*(1.0f/0.1588f) * moment[1] +
+	motor_force[3] = +0.606061f*(1.0f/0.1375f) * moment[0] - 1.04973f * moment[1] +
 	                 +b_div_4 * moment[2] + distributed_force;
 
-	motor_force[4] = -0.167f*(1.0f/0.1375f) * moment[0] - 0.167f*(1.0f/0.1588f) * moment[1] +
+	motor_force[4] = -0.606061f*(1.0f/0.1375f) * moment[0] - 1.04973f * moment[1] +
 	                 -b_div_4 * moment[2] + distributed_force;
 
-	motor_force[5] = -0.167f*(1.0f/0.275f) * moment[0]  + 0 * moment[1] +
+	motor_force[5] = -1.212121f*(1.0f/0.275f) * moment[0]  + 0 * moment[1] +
 	                 +b_div_4 * moment[2] + distributed_force;
 
 	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(motor_force[0]));
@@ -727,6 +735,8 @@ void send_geometry_tracking_ctrl_debug(debug_msg_t *payload)
 	float T2 = mat_data(motor_thrust)[1];
 	float T3 = mat_data(motor_thrust)[2];
 	float T4 = mat_data(motor_thrust)[3];
+	float T5 = mat_data(motor_thrust)[4];
+	float T6 = mat_data(motor_thrust)[5];
 
 	float time_now = get_sys_time_s();
 	
@@ -736,7 +746,8 @@ void send_geometry_tracking_ctrl_debug(debug_msg_t *payload)
 	pack_debug_debug_message_float(&T2, payload);
 	pack_debug_debug_message_float(&T3, payload);
 	pack_debug_debug_message_float(&T4, payload);	
-
+	pack_debug_debug_message_float(&T5, payload);	
+	pack_debug_debug_message_float(&T6, payload);	
 	//ex
 	pack_debug_debug_message_float(&pos_error[0], payload);
 	pack_debug_debug_message_float(&pos_error[1], payload);
