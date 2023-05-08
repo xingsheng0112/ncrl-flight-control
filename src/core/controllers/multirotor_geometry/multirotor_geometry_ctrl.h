@@ -9,7 +9,7 @@
 #define ICL_N 10
 
 typedef struct {
-	MAT_ALLOC(y_cl,4,4);	
+	MAT_ALLOC(y_cl,4,6);	
 	MAT_ALLOC(F,4,1);	//F_bar
 } ICL_sigma;
 
