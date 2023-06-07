@@ -43,6 +43,13 @@
 // yaw rate = 35
 // mass = 1.8
 
+// for optimization
+// kx = 7, 7, 35
+// kv = 5, 5, 16
+// kr = 3.3, 3.35, 40 (roll(left/right),pitch(front/back),yaw)
+// kW = 0.5, 0.5, 2.8
+// yaw rate = 35
+// mass = 1.85
 MAT_ALLOC(J, 3, 3);
 MAT_ALLOC(R, 3, 3);
 MAT_ALLOC(Rd, 3, 3);
@@ -786,19 +793,45 @@ void mr_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 	motor_force[5] = -1.212121f * (1.0f / 0.275f) * moment[0] + 0 * moment[1] +
 					 +b_div_4 * moment[2] + distributed_force;
 
-	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(motor_force[0]*1.05));
-	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(motor_force[1]*1.05));
-	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(motor_force[2]*1.05));
-	set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(motor_force[3]*1.05));
-	set_motor_value(MOTOR5, convert_motor_thrust_to_cmd(motor_force[4]*1.05));
-	set_motor_value(MOTOR6, convert_motor_thrust_to_cmd(motor_force[5]*1.05));
+	// set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(motor_force[0]*1.05*1.3358));
+	// set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(motor_force[1]*1.05*0.5588));
+	// set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(motor_force[2]*1.05*1.2648));
+	// set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(motor_force[3]*1.05*0.9368));
+	// set_motor_value(MOTOR5, convert_motor_thrust_to_cmd(motor_force[4]*1.05*0.7350));
+	// set_motor_value(MOTOR6, convert_motor_thrust_to_cmd(motor_force[5]*1.05*0.9921));
 
-	mat_data(motor_thrust)[0] = motor_force[0];
-	mat_data(motor_thrust)[1] = motor_force[1];
-	mat_data(motor_thrust)[2] = motor_force[2];
-	mat_data(motor_thrust)[3] = motor_force[3];
-	mat_data(motor_thrust)[4] = motor_force[4];
-	mat_data(motor_thrust)[5] = motor_force[5];
+	float tmp[6];
+	tmp[0] = motor_force[0]*1.05*1.2758;
+	tmp[1] = motor_force[1]*1.05*0.5425;
+	tmp[2] = motor_force[2]*1.05*1.2436;
+	tmp[3] = motor_force[3]*1.05*1.0021;
+	tmp[4] = motor_force[4]*1.05*0.5795;
+	tmp[5] = motor_force[5]*1.05*1.0604;
+	// tmp[0] = motor_force[0]*1.05;
+	// tmp[1] = motor_force[1]*1.05;
+	// tmp[2] = motor_force[2]*1.05;
+	// tmp[3] = motor_force[3]*1.05;
+	// tmp[4] = motor_force[4]*1.05;
+	// tmp[5] = motor_force[5]*1.05;
+	for(int i = 0; i<=5; i++){
+		if(tmp[i]<0.6)
+			tmp[i] = 0.6;
+		if(tmp[i]>6.0)
+			tmp[i] = 6.0;
+	}
+	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(tmp[0]));
+	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(tmp[1]));
+	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(tmp[2]));
+	set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(tmp[3]));
+	set_motor_value(MOTOR5, convert_motor_thrust_to_cmd(tmp[4]));
+	set_motor_value(MOTOR6, convert_motor_thrust_to_cmd(tmp[5]));
+
+	mat_data(motor_thrust)[0] = tmp[0];
+	mat_data(motor_thrust)[1] = tmp[1];
+	mat_data(motor_thrust)[2] = tmp[2];
+	mat_data(motor_thrust)[3] = tmp[3];
+	mat_data(motor_thrust)[4] = tmp[4];
+	mat_data(motor_thrust)[5] = tmp[5];
 }
 
 void re_geometry_ctrl_thrust_allocation(float *moment, float total_force)
@@ -824,6 +857,7 @@ void re_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 	motor_force[5] = -1.212121f * (1.0f / 0.275f) * moment[0] + 0 * moment[1] +
 					 +b_div_4 * moment[2] + distributed_force;
 	
+
 	// feedback efficiency from the estimator
 	float feedback_motor_force[6] = {0.0f};
 	feedback_motor_force[0] = motor_force[0] / mat_data(theta)[0];
@@ -841,19 +875,39 @@ void re_geometry_ctrl_thrust_allocation(float *moment, float total_force)
 	float e5 = 1.0f; // 0.8;
 	float e6 = 1.0f; // 0.8;
 
-	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(feedback_motor_force[0] * e1*1.05));
-	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(feedback_motor_force[1] * e2*1.05));
-	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(feedback_motor_force[2] * e3*1.05));
-	set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(feedback_motor_force[3] * e4*1.05));
-	set_motor_value(MOTOR5, convert_motor_thrust_to_cmd(feedback_motor_force[4] * e5*1.05));
-	set_motor_value(MOTOR6, convert_motor_thrust_to_cmd(feedback_motor_force[5] * e6*1.05));
+	float tmp[6];
+	tmp[0] = feedback_motor_force[0]*e1*1.05*1.2758;
+	tmp[1] = feedback_motor_force[1]*e2*1.05*0.5425;
+	tmp[2] = feedback_motor_force[2]*e3*1.05*1.2436;
+	tmp[3] = feedback_motor_force[3]*e4*1.05*1.0021;
+	tmp[4] = feedback_motor_force[4]*e5*1.05*0.5795;
+	tmp[5] = feedback_motor_force[5]*e6*1.05*1.0604;
+	// tmp[0] = feedback_motor_force[0]*e1*1.05;
+	// tmp[1] = feedback_motor_force[1]*e2*1.05;
+	// tmp[2] = feedback_motor_force[2]*e3*1.05;
+	// tmp[3] = feedback_motor_force[3]*e4*1.05;
+	// tmp[4] = feedback_motor_force[4]*e5*1.05;
+	// tmp[5] = feedback_motor_force[5]*e6*1.05;
+	for(int i = 0; i<=5; i++){
+		if(tmp[i]<0.6)
+			tmp[i] = 0.6;
+		if(tmp[i]>6.0)
+			tmp[i] = 6.0;
+	}
 
-	mat_data(motor_thrust)[0] = feedback_motor_force[0] * e1;
-	mat_data(motor_thrust)[1] = feedback_motor_force[1] * e2;
-	mat_data(motor_thrust)[2] = feedback_motor_force[2] * e3;
-	mat_data(motor_thrust)[3] = feedback_motor_force[3] * e4;
-	mat_data(motor_thrust)[4] = feedback_motor_force[4] * e5;
-	mat_data(motor_thrust)[5] = feedback_motor_force[5] * e6;
+	set_motor_value(MOTOR1, convert_motor_thrust_to_cmd(tmp[0]));
+	set_motor_value(MOTOR2, convert_motor_thrust_to_cmd(tmp[1]));
+	set_motor_value(MOTOR3, convert_motor_thrust_to_cmd(tmp[2]));
+	set_motor_value(MOTOR4, convert_motor_thrust_to_cmd(tmp[3]));
+	set_motor_value(MOTOR5, convert_motor_thrust_to_cmd(tmp[4]));
+	set_motor_value(MOTOR6, convert_motor_thrust_to_cmd(tmp[5]));
+
+	mat_data(motor_thrust)[0] = tmp[0];
+	mat_data(motor_thrust)[1] = tmp[1];
+	mat_data(motor_thrust)[2] = tmp[2];
+	mat_data(motor_thrust)[3] = tmp[3];
+	mat_data(motor_thrust)[4] = tmp[4];
+	mat_data(motor_thrust)[5] = tmp[5];
 }
 
 void rc_mode_handler_geometry_ctrl(radio_t *rc)
