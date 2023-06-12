@@ -6,7 +6,7 @@
 #include "debug_link.h"
 #include "matrix.h"
 
-#define ICL_N 10
+#define ICL_N 25
 
 typedef struct {
 	MAT_ALLOC(y_cl,4,6);	

@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "waypoint_following.h": "c"
+        "waypoint_following.h": "c",
+        "sys_time.h": "c"
     }
 }
