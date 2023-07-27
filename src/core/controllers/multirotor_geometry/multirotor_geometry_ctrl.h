@@ -6,7 +6,8 @@
 #include "debug_link.h"
 #include "matrix.h"
 
-#define ICL_N 25
+#define ICL_N 10
+//25 for time step
 
 typedef struct {
 	MAT_ALLOC(y_cl,4,6);	
